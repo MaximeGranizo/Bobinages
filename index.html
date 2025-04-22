@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Star of Slots Visualizer</title>
+  <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+  <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2em;
+    }
+    label {
+      display: inline-block;
+      width: 100px;
+    }
+    input {
+      width: 60px;
+    }
+    #controls {
+      margin-bottom: 1em;
+    }
+    canvas {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>Star of Slots Visualizer</h1>
+
+  <div id="controls">
+    <label for="nb_poles">Nb Poles:</label>
+    <input type="number" id="nb_poles" value="10" step="2"><br><br>
+
+    <label for="nb_slots">Nb Slots:</label>
+    <input type="number" id="nb_slots" value="12" step="3"><br><br>
+
+    <label for="nb_layers">Nb Layers:</label>
+    <select id="nb_layers">
+      <option value="1">1</option>
+      <option value="2" selected>2</option>
+    </select><br><br>
+
+    <button py-click="update_fig()">Afficher la figure</button>
+  </div>
+
+  <py-script>
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from js import document
+    from pyodide.ffi import create_proxy
+
+    # Copie ici toutes tes fonctions Python : angle_in_sector, star_of_slots, draw_magnets, etc.
+    # (tu peux coller ton code ici directement à la suite)
+
+    # Pour illustrer : une version minimaliste pour le test
+    def update_fig():
+        nb_poles = int(document.getElementById("nb_poles").value)
+        nb_slots = int(document.getElementById("nb_slots").value)
+        nb_layers = int(document.getElementById("nb_layers").value)
+
+        plt.clf()
+        show_winding(m=3, see_electrical_domain=1, nb_poles=nb_poles, nb_slots=nb_slots, nb_layers=nb_layers)
+        plt.show()
+  </py-script>
+</body>
+</html>
