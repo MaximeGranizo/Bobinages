@@ -1,5 +1,8 @@
 import streamlit as st
 import matplotlib.pyplot as plt
+import math
+import numpy as np
+from matplotlib.patches import Patch, Circle, Polygon, Wedge
 
 
 def angle_in_sector(angle, center, width):
