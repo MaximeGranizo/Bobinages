@@ -318,7 +318,7 @@ st.write(f"Winding Factor : {kw:.3f}")
 st.write(f"Nombre de sections identiques : {sections}")
 st.write(f"Fréquence d'ondulation du couple : {f_torque}")
 
-fig1, ax1 = plt.subplots(subplot_kw={'projection': 'polar'}, facecolor='transparent')
+fig1, ax1 = plt.subplots(subplot_kw={'projection': 'polar'}, ) # facecolor='transparent'
 ax1.set_theta_zero_location('N')
 ax1.set_yticklabels([])
 ax1.set_xticklabels([])
