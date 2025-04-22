@@ -323,6 +323,7 @@ ax1.set_theta_zero_location('N')
 ax1.set_yticklabels([])
 ax1.set_xticklabels([])
 ax1.grid(False)
+fig.patch.set_facecolor('none')  # Transparent background for the figure
 
 star_of_slots(m, nb_poles, nb_slots, nb_layers, fig1, ax1, "Domaine mécanique")
 draw_magnets(nb_poles, fig1, ax1)
