@@ -13,12 +13,20 @@
     }
     #chart {
       margin: auto;
-      width: 600px;
-      height: 600px;
+      width: 700px;
+      height: 700px;
     }
     select {
       margin: 5px;
       padding: 5px;
+    }
+    #info {
+      margin-top: 15px;
+      padding: 10px;
+      background: #2a2a2a;
+      border-radius: 8px;
+      display: inline-block;
+      text-align: left;
     }
   </style>
 </head>
@@ -35,16 +43,39 @@
   <select id="coilspan"></select>
 
   <svg id="chart"></svg>
+  <div id="info"></div>
 
   <script>
-    const width = 600, height = 600, radius = 250;
+    const width = 700, height = 700, radius = 250;
     const svg = d3.select("#chart")
                   .attr("width", width)
                   .attr("height", height)
                   .append("g")
                   .attr("transform", `translate(${width/2},${height/2})`);
 
-    // Initialisation des menus
+    const m = 3; // nombre de phases
+    const phaseColors = ["red","blue","green"];
+    const phaseLabels = ["A","B","C"];
+
+    // Fonctions utilitaires
+    function pgcd(a,b){ return b ? pgcd(b, a%b) : a; }
+    function ppcm(a,b){ return a*b/pgcd(a,b); }
+
+    function calculateWindingCharacteristics(m, Ns, p, nbLayers, coilSpan) {
+      const q = Ns / p / m;
+      let windingType = "inconnu";
+      if (coilSpan === 1) windingType = "Bobinage à pas dentaire";
+      else if (q === Math.floor(q)) windingType = "Bobinage distribué entier";
+      else if (q > 1) windingType = "Bobinage distribué à pas raccourci";
+
+      const f_torque = ppcm(p, Ns);
+      const sections = pgcd(Ns, p);
+      const unbalanced = (Ns/(m*pgcd(Ns, p/2))) % 1 !== 0;
+      const warning = (q < 0.25 || sections < 2 || unbalanced);
+
+      return {f_torque, sections, windingType, warning, q};
+    }
+
     function fillSelect(id, values) {
       const sel = d3.select(id);
       sel.selectAll("option").remove();
@@ -55,6 +86,8 @@
          .text(d => d)
          .attr("value", d => d);
     }
+
+    // Initialisation des menus
     fillSelect("#poles", d3.range(2, 41, 2));
     fillSelect("#slots", d3.range(3, 61, 3));
     fillSelect("#layers", [1,2]);
@@ -65,7 +98,23 @@
       svg.selectAll("*").remove();
       const poles = +d3.select("#poles").property("value");
       const slots = +d3.select("#slots").property("value");
+      const layers = +d3.select("#layers").property("value");
+      const coilspan = +d3.select("#coilspan").property("value");
 
+      // Calculs
+      const res = calculateWindingCharacteristics(m, slots, poles, layers, coilspan);
+
+      // Affichage infos
+      d3.select("#info").html(`
+        <b>Résultats :</b><br>
+        Facteur q = ${res.q.toFixed(3)}<br>
+        Fréquence ondulation couple = ${res.f_torque}<br>
+        Sections identiques = ${res.sections}<br>
+        Type de bobinage = ${res.windingType}<br>
+        ${res.warning ? "⚠️ Attention : bobinage non optimal" : "✅ Bobinage valide"}
+      `);
+
+      // Tracé des slots
       const angles = d3.range(slots).map(i => 2*Math.PI*i/slots);
       svg.selectAll("circle")
          .data(angles)
@@ -74,12 +123,23 @@
          .attr("cx", d => radius*Math.cos(d-Math.PI/2))
          .attr("cy", d => radius*Math.sin(d-Math.PI/2))
          .attr("r", 6)
-         .attr("fill", (d,i) => i%2==0 ? "red" : "blue");
+         .attr("fill", (d,i) => phaseColors[i % m]);
+
+      // Tracé pôles
+      const poleAngles = d3.range(poles).map(i => 2*Math.PI*i/poles);
+      svg.selectAll("line")
+         .data(poleAngles)
+         .enter()
+         .append("line")
+         .attr("x1", 0).attr("y1", 0)
+         .attr("x2", d => (radius+50)*Math.cos(d-Math.PI/2))
+         .attr("y2", d => (radius+50)*Math.sin(d-Math.PI/2))
+         .attr("stroke", (d,i)=> i%2==0?"red":"blue")
+         .attr("stroke-width", 3)
+         .attr("opacity",0.5);
     }
 
-    // Réagir aux changements
     d3.selectAll("select").on("change", draw);
-
     draw();
   </script>
 </body>
