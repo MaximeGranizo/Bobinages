@@ -1,146 +1,539 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Visualisation du bobinage</title>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <style>
-    body {
-      background-color: #1e1e1e;
-      color: white;
-      font-family: sans-serif;
-      text-align: center;
-    }
-    #chart {
-      margin: auto;
-      width: 700px;
-      height: 700px;
-    }
-    select {
-      margin: 5px;
-      padding: 5px;
-    }
-    #info {
-      margin-top: 15px;
-      padding: 10px;
-      background: #2a2a2a;
-      border-radius: 8px;
-      display: inline-block;
-      text-align: left;
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visualisation de bobinage (JS)</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #141822;
+    --plot-bg: #1e1e1e; /* pas noir noir */
+    --fg: #e6e6e6;
+    --muted: #9aa4b2;
+    --accent: #6ea8fe;
+    --bad: #ff7676;
+    --warn: #ffc86b;
+    --good: #66d587;
+  }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  }
+  .wrap {
+    max-width: 1100px; margin: 24px auto; padding: 0 16px;
+  }
+  h1 { font-size: 22px; margin: 0 0 16px; font-weight: 700; }
+  .grid {
+    display: grid; gap: 16px;
+    grid-template-columns: 320px 1fr;
+  }
+  .card {
+    background: var(--panel); border-radius: 14px; padding: 14px 14px 10px; box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+  }
+  .controls label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+  select, input[type="number"]{
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3142;
+    background: #0f1320; color: var(--fg); outline: none;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn {
+    display: inline-block; background: var(--accent); color: #0b1220; font-weight: 700;
+    padding: 10px 12px; border-radius: 10px; border: none; cursor: pointer; margin-top: 10px;
+  }
+  .btn:active { transform: translateY(1px); }
+  .plot-card { position: relative; }
+  canvas { width: 100%; height: 640px; background: var(--plot-bg); border-radius: 14px; display: block; }
+  .legend { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .kpi {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;
+  }
+  .kpi .box {
+    background: #0f1320; border: 1px solid #2a3142; border-radius: 12px; padding: 10px;
+  }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .note { color: var(--muted); font-size: 12px; }
+  .warn { color: var(--warn); }
+  .bad  { color: var(--bad); }
+  .good { color: var(--good); }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } canvas { height: 520px; } }
+</style>
 </head>
 <body>
-  <h1>Visualisation du bobinage d'une machine électrique</h1>
+<div class="wrap">
+  <h1>Visualisation du bobinage d’une machine électrique</h1>
+  <div class="grid">
+    <div class="card controls">
+      <div class="row">
+        <div>
+          <label>Nombre de pôles (pair)</label>
+          <select id="poles"></select>
+        </div>
+        <div>
+          <label>Nombre d’encoches (×3)</label>
+          <select id="slots"></select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Nombre de couches</label>
+          <select id="layers"></select>
+        </div>
+        <div>
+          <label>Pas de bobine (en encoches)</label>
+          <select id="coilSpan"></select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Afficher têtes de bobines ?</label>
+          <select id="endTurns">
+            <option value="1">Oui</option>
+            <option value="0" selected>Non</option>
+          </select>
+        </div>
+        <div>
+          <label>Voir domaine électrique ?</label>
+          <select id="elecDomain">
+            <option value="1">Oui</option>
+            <option value="0" selected>Non</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" id="go">Tracer / Calculer</button>
+      <div class="note" id="messages"></div>
+      <div class="kpi">
+        <div class="box"><div class="note">Facteur de bobinage | <span class="mono">kw</span></div><div id="kw" class="mono">–</div></div>
+        <div class="box"><div class="note">Ondulations couple (par tour)</div><div id="torque" class="mono">–</div></div>
+        <div class="box"><div class="note">Sections identiques</div><div id="sections" class="mono">–</div></div>
+        <div class="box"><div class="note">Type</div><div id="wtype" class="mono">–</div></div>
+      </div>
+    </div>
 
-  <label>Pôles :</label>
-  <select id="poles"></select>
-  <label>Encoches :</label>
-  <select id="slots"></select>
-  <label>Couches :</label>
-  <select id="layers"></select>
-  <label>Pas de bobine :</label>
-  <select id="coilspan"></select>
+    <div class="card plot-card">
+      <canvas id="plot" width="1000" height="1000"></canvas>
+      <div class="legend">Fond gris foncé (pas noir noir). Phases A/B/C en rouge/bleu/vert, pôles rotor en alternance.</div>
+    </div>
+  </div>
+</div>
 
-  <svg id="chart"></svg>
-  <div id="info"></div>
+<script>
+/* ===========================
+   1) Petites utilitaires
+=========================== */
+const TAU = Math.PI * 2;
+const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
+function deg(x){ return x*180/Math.PI; }
+function mod(a, n){ return ((a % n) + n) % n; }
+function numberToLetter(n){ return String.fromCharCode('a'.charCodeAt(0) + (parseInt(n,10) - 1)); }
+function angleInSector(angle, center, width){
+  angle = +angle; center = +center;
+  angle = +(mod(angle, TAU)).toFixed(6);
+  center = mod(center, TAU);
+  const half = width/2;
+  const lower = +(mod(center - half, TAU)).toFixed(6);
+  const upper = +(mod(center + half, TAU)).toFixed(6);
+  if (lower < upper) return (lower < angle && angle <= upper);
+  return (angle > lower || angle <= upper);
+}
 
-  <script>
-    const width = 700, height = 700, radius = 250;
-    const svg = d3.select("#chart")
-                  .attr("width", width)
-                  .attr("height", height)
-                  .append("g")
-                  .attr("transform", `translate(${width/2},${height/2})`);
+/* ===========================
+   2) Listes dynamiques
+=========================== */
+function layersPossibilitiesList(nb_slot, nb_pole){
+  nb_slot = +nb_slot; nb_pole = +nb_pole;
+  // même logique que ton app.py
+  if (parseInt(nb_slot/2) !== nb_slot/2){
+    return [2,4,6,8];
+  } else {
+    return [1,2,4,6,8];
+  }
+}
+function coilSpanPossibilitiesList(nb_layer, nb_slot, nb_pole){
+  nb_layer = +nb_layer; nb_slot = +nb_slot; nb_pole = +nb_pole;
+  const m = 3;
+  if (nb_slot/(nb_pole*m) < 1) return [1];
+  const arr = [];
+  for (let k=Math.floor(nb_slot/2); k>=1; k--) arr.push(k);
+  return arr;
+}
 
-    const m = 3; // nombre de phases
-    const phaseColors = ["red","blue","green"];
-    const phaseLabels = ["A","B","C"];
+/* ===========================
+   3) Caractéristiques bobinage
+=========================== */
+function ppcm(a,b){ return (a*b)/gcd(a,b); }
+function gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ const t=b; b=a%b; a=t; } return a; }
 
-    // Fonctions utilitaires
-    function pgcd(a,b){ return b ? pgcd(b, a%b) : a; }
-    function ppcm(a,b){ return a*b/pgcd(a,b); }
-
-    function calculateWindingCharacteristics(m, Ns, p, nbLayers, coilSpan) {
-      const q = Ns / p / m;
-      let windingType = "inconnu";
-      if (coilSpan === 1) windingType = "Bobinage à pas dentaire";
-      else if (q === Math.floor(q)) windingType = "Bobinage distribué entier";
-      else if (q > 1) windingType = "Bobinage distribué à pas raccourci";
-
-      const f_torque = ppcm(p, Ns);
-      const sections = pgcd(Ns, p);
-      const unbalanced = (Ns/(m*pgcd(Ns, p/2))) % 1 !== 0;
-      const warning = (q < 0.25 || sections < 2 || unbalanced);
-
-      return {f_torque, sections, windingType, warning, q};
+function calculateWindingCharacteristics(m, Ns, p, nb_layers, coil_span, silent=false){
+  m=+m; Ns=+Ns; p=+p; nb_layers=+nb_layers; coil_span=+coil_span;
+  const q = Ns / p / m;               // encoches/pôle/phase
+  const pole_pairs = p/2;
+  const f_torque = ppcm(p, Ns);       // fréq. ondulations (par tour)
+  const nb_of_identic_sections = gcd(Ns, p); // sections identiques
+  // Heuristique type de bobinage (aligné avec ton app.py)
+  let winding_type = '';
+  if (Ns/(m*p) < 1){
+    winding_type = 'Bobinage concentré';
+  } else {
+    if (coil_span === 1){
+      winding_type = 'Bobinage à pas dentaire';
+    } else if (Number.isInteger(Ns/(m*p))){
+      winding_type = 'Bobinage distribué à nombre d’encoches par pôle et par phase entier';
+    } else {
+      winding_type = 'Bobinage distribué à pas raccourcit';
     }
+  }
+  // drapeaux d’avertissement
+  let warning_flag = false;
+  if (q < 0.25) warning_flag = true;
+  if (nb_of_identic_sections < 2) warning_flag = true;
+  const S = (Ns/(m*gcd(Ns, parseInt(p/2,10))));
+  if (S - Math.floor(S) > 0) warning_flag = true;
 
-    function fillSelect(id, values) {
-      const sel = d3.select(id);
-      sel.selectAll("option").remove();
-      sel.selectAll("option")
-         .data(values)
-         .enter()
-         .append("option")
-         .text(d => d)
-         .attr("value", d => d);
+  return { f_torque, nb_of_identic_sections, winding_type, warning_flag };
+}
+
+/* ===========================
+   4) FFT minimale (DFT) pour kw
+=========================== */
+function dftComplex(x){
+  // x: array de réels → retourne spectre complexe {re, im}
+  const N = x.length;
+  const out = new Array(N).fill(0).map(()=>({re:0, im:0}));
+  for (let k=0; k<N; k++){
+    let re=0, im=0;
+    for (let n=0; n<N; n++){
+      const ang = -2*Math.PI*k*n/N;
+      const c = Math.cos(ang), s = Math.sin(ang);
+      re += x[n]*c; im += x[n]*s;
     }
+    out[k] = {re, im};
+  }
+  return out;
+}
+function complexAbs(z){ return Math.hypot(z.re, z.im); }
 
-    // Initialisation des menus
-    fillSelect("#poles", d3.range(2, 41, 2));
-    fillSelect("#slots", d3.range(3, 61, 3));
-    fillSelect("#layers", [1,2]);
-    fillSelect("#coilspan", [1,2,3,4,5,6]);
+/* ===========================
+   5) Dessins (canvas)
+=========================== */
+const canvas = document.getElementById('plot');
+const ctx = canvas.getContext('2d');
 
-    // Fonction de tracé
-    function draw() {
-      svg.selectAll("*").remove();
-      const poles = +d3.select("#poles").property("value");
-      const slots = +d3.select("#slots").property("value");
-      const layers = +d3.select("#layers").property("value");
-      const coilspan = +d3.select("#coilspan").property("value");
+function clearPlot(){
+  ctx.save();
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--plot-bg');
+  ctx.fillRect(0,0,canvas.width, canvas.height);
+  ctx.restore();
+}
+// conv polaire → écran
+function P(r, th, cx, cy, scale){
+  return [cx + r*Math.cos(th)*scale, cy + r*Math.sin(th)*scale];
+}
+function drawStator(nb_slots){
+  const cx = canvas.width/2, cy = canvas.height/2, scale=380;
+  const rBase = 0.95;
+  const toothH = 0.43; // cohérent avec app.py
+  const slotPitch = TAU/nb_slots;
+  ctx.save();
+  ctx.strokeStyle = '#dadde4'; ctx.globalAlpha = 0.35;
+  // cercle stator
+  ctx.beginPath();
+  ctx.arc(cx, cy, rBase*scale, 0, TAU);
+  ctx.stroke();
+  // dents (petits rectangles radiaux)
+  for (let s=0; s<nb_slots; s++){
+    const angle = s*slotPitch;
+    const r1 = rBase - toothH, r2 = rBase;
+    const w = slotPitch*0.4;
+    // deux bords
+    const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
+    const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
+    const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
+    const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
+    ctx.beginPath();
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.lineTo(x4,y4); ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawMagnets(nb_poles){
+  const cx = canvas.width/2, cy = canvas.height/2, scale=380;
+  const polePitch = TAU/nb_poles;
+  const rInner = 0.35, rOuter = 0.52;
+  ctx.save();
+  for (let k=0; k<nb_poles; k++){
+    const start = k*polePitch, end = (k+1)*polePitch;
+    ctx.beginPath();
+    // wedge
+    ctx.moveTo(...P(0,0,cx,cy,scale));
+    ctx.arc(cx,cy, rOuter*scale, start, end);
+    ctx.lineTo(...P(rInner, end, cx,cy,scale));
+    ctx.arc(cx,cy, rInner*scale, end, start, true);
+    ctx.closePath();
+    ctx.fillStyle = (k%2===0) ? 'rgba(255,80,80,0.6)' : 'rgba(80,140,255,0.6)';
+    ctx.fill();
+  }
+  ctx.restore();
+}
 
-      // Calculs
-      const res = calculateWindingCharacteristics(m, slots, poles, layers, coilspan);
+/* ===========================
+   6) Star of slots + distribution
+=========================== */
+function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){
+  const { electrical=false, raccourcissement=0, plotEndTurns=false, legend=false, silent=true } = options||{};
+  const poles_pair = nb_poles/2;
+  const phaseLabels = ['A','B','C','D','E','F'].slice(0,m);
+  const phaseColors = ['#ff4d4d','#4d80ff','#31c159','#ffa640','#a56bff','#27c0d8'].slice(0,m);
+  const sectorWidth = Math.PI/m;
+  const slotPitch = TAU/nb_slots;
+  const radiusPhasor = 0.8;
+  const phasors = Object.fromEntries(phaseLabels.map(L=>[L,[]]));
+  // distribution des conducteurs (Q × m)
+  const CD = Array.from({length: nb_slots}, ()=>Array(m).fill(0));
+  let warning_flag = false;
 
-      // Affichage infos
-      d3.select("#info").html(`
-        <b>Résultats :</b><br>
-        Facteur q = ${res.q.toFixed(3)}<br>
-        Fréquence ondulation couple = ${res.f_torque}<br>
-        Sections identiques = ${res.sections}<br>
-        Type de bobinage = ${res.windingType}<br>
-        ${res.warning ? "⚠️ Attention : bobinage non optimal" : "✅ Bobinage valide"}
-      `);
-
-      // Tracé des slots
-      const angles = d3.range(slots).map(i => 2*Math.PI*i/slots);
-      svg.selectAll("circle")
-         .data(angles)
-         .enter()
-         .append("circle")
-         .attr("cx", d => radius*Math.cos(d-Math.PI/2))
-         .attr("cy", d => radius*Math.sin(d-Math.PI/2))
-         .attr("r", 6)
-         .attr("fill", (d,i) => phaseColors[i % m]);
-
-      // Tracé pôles
-      const poleAngles = d3.range(poles).map(i => 2*Math.PI*i/poles);
-      svg.selectAll("line")
-         .data(poleAngles)
-         .enter()
-         .append("line")
-         .attr("x1", 0).attr("y1", 0)
-         .attr("x2", d => (radius+50)*Math.cos(d-Math.PI/2))
-         .attr("y2", d => (radius+50)*Math.sin(d-Math.PI/2))
-         .attr("stroke", (d,i)=> i%2==0?"red":"blue")
-         .attr("stroke-width", 3)
-         .attr("opacity",0.5);
+  // affichage des secteurs (électrique)
+  if (electrical){
+    // fond radial des secteurs
+    const cx = canvas.width/2, cy = canvas.height/2, scale=380;
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    for (let j=0;j<m;j++){
+      const center = -2*Math.PI*j/m;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy, radiusPhasor*scale, center-sectorWidth/2, center+sectorWidth/2);
+      ctx.closePath();
+      ctx.fillStyle = phaseColors[j];
+      ctx.fill();
     }
+    ctx.restore();
+  }
 
-    d3.selectAll("select").on("change", draw);
-    draw();
-  </script>
+  // Placement des bobines (aller/retour) et remplissage CD
+  let coil_span_nb = 1;
+  if (winding_type === 'Bobinage distribué à pas raccourcit' ||
+      winding_type === 'Bobinage distribué à nombre d’encoches par pôle et par phase entier'){
+    coil_span_nb = Math.max(1, +raccourcissement);
+  } else if (winding_type === 'Bobinage à pas dentaire'){
+    coil_span_nb = 1;
+  } else if (winding_type === 'Bobinage concentré'){
+    coil_span_nb = 1;
+  }
+  const turnsWeight = 1/Math.max(nb_layers,1);
+
+  const cx = canvas.width/2, cy = canvas.height/2, scale=380;
+  // tracé des phasors de fente
+  ctx.save();
+  ctx.lineWidth = 2;
+  for (let s=0; s<nb_slots; s++){
+    const mech = s*slotPitch;
+    const elec = mech*poles_pair + Math.PI/6; // même décalage que le Python
+    // assignation phase
+    let phaseIdx = -1, sign = +1;
+    for (let j=0;j<m;j++){
+      const centerPos = -2*Math.PI*j/m;
+      const centerNeg = centerPos + Math.PI;
+      if (angleInSector(elec, centerPos, sectorWidth)){ phaseIdx = j; sign = +1; break; }
+      if (angleInSector(elec, centerNeg, sectorWidth)){ phaseIdx = j; sign = -1; break; }
+    }
+    if (phaseIdx<0){ warning_flag = true; continue; }
+
+    // affectation dans CD (aller/retour plus tard via coil span)
+    // ici on ne remplit pas « tout de suite » l’aller/retour, on le fait par paires
+  }
+  ctx.restore();
+
+  // Remplissage par paires aller/retour avec prise en compte des couches
+  let previous_slot = -1;
+  for (let k=0; k<Math.floor(nb_layers*nb_slots/2); k++){
+    let go = (previous_slot + 1) % nb_slots;
+    let ret = (go + coil_span_nb) % nb_slots;
+    let counter = 0;
+    while ((Math.abs(CD[go].reduce((a,b)=>a+Math.abs(b),0)) >= 1 ||
+            Math.abs(CD[ret].reduce((a,b)=>a+Math.abs(b),0)) >= 1) && counter <= go){
+      go = (go + 1) % nb_slots;
+      ret = (go + coil_span_nb) % nb_slots;
+      counter++;
+    }
+    if (counter > go){ warning_flag = true; }
+    previous_slot = go;
+
+    const mech = go*slotPitch;
+    const elec = mech*poles_pair + Math.PI/6;
+
+    // déterminer phase & polarité
+    let phaseIdx = -1, polarity = +1;
+    for (let j=0;j<m;j++){
+      const centerPos = -2*Math.PI*j/m;
+      const centerNeg = centerPos + Math.PI;
+      if (angleInSector(elec, centerPos, sectorWidth)){ phaseIdx=j; polarity=+1; break; }
+      if (angleInSector(elec, centerNeg, sectorWidth)){ phaseIdx=j; polarity=-1; break; }
+    }
+    if (phaseIdx<0){ warning_flag = true; continue; }
+
+    CD[go][phaseIdx] +=  polarity*turnsWeight;
+    CD[ret][phaseIdx] += -polarity*turnsWeight;
+
+    // enregistrer phasors (pour affichage)
+    const phaseLbl = ['A','B','C','D','E','F'][phaseIdx];
+    phasors[phaseLbl].push({slot: go, sign: polarity});
+  }
+
+  // TRACÉ des vecteurs par fente (aller-retour)
+  ctx.save();
+  const r0 = 0.45, r1 = 0.83; // longueur vecteurs
+  for (let s=0; s<nb_slots; s++){
+    // pour chaque phase présente dans CD[s], tracer un segment
+    for (let j=0;j<m;j++){
+      const w = CD[s][j];
+      if (w === 0) continue;
+      const color = ['#ff4d4d','#4d80ff','#31c159','#ffa640','#a56bff','#27c0d8'][j];
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = Math.min(1, Math.abs(w)*1.2);
+      const theta = s*slotPitch;
+      const [x0,y0] = P(r0, theta, cx,cy,scale);
+      const [x1_,y1_] = P(r1, theta, cx,cy,scale);
+      // signe → sens (juste petit marqueur)
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1_,y1_); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  return { phasors, Conductors_distribution: CD, warning_flag };
+}
+
+/* ===========================
+   7) Facteur de bobinage (Scuiller)
+=========================== */
+function calculerFacteurDeBobinage(phasors, CD, nb_slots, nb_poles, m){
+  const Q = nb_slots, N = m, p = nb_poles/2;
+  // vecteur spatial : (N/Q) * FFT(CD[:,0]) — on suit la colonne phase A
+  const space = dftComplex(CD.map(row => row[0]||0)).map(z => ({re: (N/Q)*z.re, im: (N/Q)*z.im}));
+  // remappage harmonique électrique : indices = mod(p * [0:Q-1], Q)
+  const Kw_he = new Array(Q);
+  for (let k=0; k<Q; k++){
+    const idx = (p * k) % Q; // p peut être .5, mais dans notre cas nb_poles pair → p entier
+    Kw_he[k] = space[idx];
+  }
+  const fundamental = Kw_he[1];
+  return complexAbs(fundamental);
+}
+
+/* ===========================
+   8) Orchestrateur
+=========================== */
+function showWinding({m=3, nb_poles=14, nb_slots=12, nb_layers=2, raccourcissement=1, plot_end_turns=false, electrical=false}){
+  clearPlot();
+  // arrière-plan stator & rot
+  drawMagnets(nb_poles);
+  drawStator(nb_slots);
+
+  const { f_torque, nb_of_identic_sections, winding_type, warning_flag:warn1 } =
+    calculateWindingCharacteristics(m, nb_slots, nb_poles, nb_layers, raccourcissement);
+
+  const { phasors, Conductors_distribution, warning_flag:warn2 } =
+    starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, {
+      electrical, raccourcissement, plotEndTurns: plot_end_turns, legend:false, silent:true
+    });
+
+  const kw = calculerFacteurDeBobinage(phasors, Conductors_distribution, nb_slots, nb_poles, m);
+  return {
+    kw, torque_ripple_freq: f_torque, identical_sections: nb_of_identic_sections,
+    winding_type, warning_flag: (warn1 || warn2)
+  };
+}
+
+/* ===========================
+   9) UI + logique
+=========================== */
+const $poles = document.getElementById('poles');
+const $slots = document.getElementById('slots');
+const $layers = document.getElementById('layers');
+const $coil  = document.getElementById('coilSpan');
+const $endT  = document.getElementById('endTurns');
+const $elec  = document.getElementById('elecDomain');
+const $go    = document.getElementById('go');
+const $msg   = document.getElementById('messages');
+
+function fillSelect($el, values, sel){
+  $el.innerHTML = '';
+  values.forEach(v=>{
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    if (sel!=null && +v===+sel) opt.selected = true;
+    $el.appendChild(opt);
+  });
+}
+fillSelect($poles, Array.from({length:20},(_,i)=>2*(i+1)), 10);
+fillSelect($slots, Array.from({length:20},(_,i)=>3*(i+1)), 12);
+
+function refreshDynamic(){
+  $msg.textContent = '';
+  const m = 3;
+  const poles = +$poles.value;
+  const slots = +$slots.value;
+
+  // couches
+  const L = layersPossibilitiesList(slots, poles);
+  let defaultLayers;
+  if (slots/(m*poles) < 1) defaultLayers = 2; else defaultLayers = L[0];
+  fillSelect($layers, L, defaultLayers);
+
+  // pas de bobine
+  const coilList = coilSpanPossibilitiesList(+$layers.value, slots, poles).sort((a,b)=>b-a);
+  let defaultSpan = (slots/(m*poles) < 1) ? 1 : Math.max(1, Math.floor(slots/poles));
+  if (!coilList.includes(defaultSpan)) defaultSpan = coilList[0] ?? 1;
+  fillSelect($coil, coilList, defaultSpan);
+}
+$poles.addEventListener('change', refreshDynamic);
+$slots.addEventListener('change', refreshDynamic);
+$layers.addEventListener('change', refreshDynamic);
+refreshDynamic();
+
+$go.addEventListener('click', ()=>{
+  try{
+    const m = 3;
+    const poles = +$poles.value;
+    const slots = +$slots.value;
+    const layers = +$layers.value;
+    const coil   = +$coil.value;
+    const endTurns = +$endT.value===1;
+    const elec   = +$elec.value===1;
+
+    // validations (mêmes que app.py)
+    if (poles%2 !== 0) throw new Error("❌ Le nombre de pôles doit être pair.");
+    if (slots%3 !== 0) throw new Error("❌ Le nombre d’encoches doit être un multiple de 3.");
+    if (layers < 1 || layers > 30) throw new Error("❌ Le nombre de couches doit être entre 1 et 30.");
+    if (layers === 1 && ((slots % 2 === 1) || (coil % 2 === 0)))
+      throw new Error("❌ Bobinage à une couche non faisable.");
+    if ((layers * slots / 2) !== Math.floor(layers * slots / 2))
+      throw new Error("❌ Les trois phases ont un nombre déséquilibré de conducteurs.");
+    if ((slots / (m * gcd(slots, parseInt(poles/2,10)))) !== Math.floor(slots / (m * gcd(slots, parseInt(poles/2,10)))))
+      throw new Error("❌ Bobinage non équilibré (slots / (m * pgcd) non entier).");
+
+    const res = showWinding({
+      m, nb_poles:poles, nb_slots:slots, nb_layers:layers,
+      raccourcissement:coil, plot_end_turns:endTurns, electrical:elec
+    });
+
+    document.getElementById('kw').textContent = res.kw.toFixed(3);
+    document.getElementById('torque').textContent = String(res.torque_ripple_freq);
+    document.getElementById('sections').textContent = String(res.identical_sections);
+    document.getElementById('wtype').textContent = res.winding_type;
+
+    if (res.warning_flag){
+      $msg.innerHTML = "<span class='warn'>⚠️ Attention : la machine ne peut pas être bobinée complètement de manière équilibrée, ou présente des risques (q trop faible, pas de symétrie…).</span>";
+    } else {
+      $msg.innerHTML = "<span class='good'>✅ OK</span>";
+    }
+  } catch (e){
+    $msg.innerHTML = "<span class='bad'>" + e.message + "</span>";
+  }
+});
+
+// premier rendu
+$go.click();
+</script>
 </body>
 </html>
