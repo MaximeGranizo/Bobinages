@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualisation du bobinage</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background-color: #1e1e1e;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    #chart {
+      margin: auto;
+      width: 600px;
+      height: 600px;
+    }
+    select {
+      margin: 5px;
+      padding: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Visualisation du bobinage d'une machine électrique</h1>
+
+  <label>Pôles :</label>
+  <select id="poles"></select>
+  <label>Encoches :</label>
+  <select id="slots"></select>
+  <label>Couches :</label>
+  <select id="layers"></select>
+  <label>Pas de bobine :</label>
+  <select id="coilspan"></select>
+
+  <svg id="chart"></svg>
+
+  <script>
+    const width = 600, height = 600, radius = 250;
+    const svg = d3.select("#chart")
+                  .attr("width", width)
+                  .attr("height", height)
+                  .append("g")
+                  .attr("transform", `translate(${width/2},${height/2})`);
+
+    // Initialisation des menus
+    function fillSelect(id, values) {
+      const sel = d3.select(id);
+      sel.selectAll("option").remove();
+      sel.selectAll("option")
+         .data(values)
+         .enter()
+         .append("option")
+         .text(d => d)
+         .attr("value", d => d);
+    }
+    fillSelect("#poles", d3.range(2, 41, 2));
+    fillSelect("#slots", d3.range(3, 61, 3));
+    fillSelect("#layers", [1,2]);
+    fillSelect("#coilspan", [1,2,3,4,5,6]);
+
+    // Fonction de tracé
+    function draw() {
+      svg.selectAll("*").remove();
+      const poles = +d3.select("#poles").property("value");
+      const slots = +d3.select("#slots").property("value");
+
+      const angles = d3.range(slots).map(i => 2*Math.PI*i/slots);
+      svg.selectAll("circle")
+         .data(angles)
+         .enter()
+         .append("circle")
+         .attr("cx", d => radius*Math.cos(d-Math.PI/2))
+         .attr("cy", d => radius*Math.sin(d-Math.PI/2))
+         .attr("r", 6)
+         .attr("fill", (d,i) => i%2==0 ? "red" : "blue");
+    }
+
+    // Réagir aux changements
+    d3.selectAll("select").on("change", draw);
+
+    draw();
+  </script>
+</body>
+</html>
