@@ -280,7 +280,6 @@ function drawMagnets(nb_poles){
    6) Star of slots + distribution
 =========================== */ 
   
-  
   function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){
   const { electrical=false, raccourcissement=0, plotEndTurns=false, legend=false, silent=true } = options||{};
   const poles_pair = nb_poles/2;
@@ -307,7 +306,8 @@ function drawMagnets(nb_poles){
     let ret = (go + coil_span_nb) % nb_slots;
     let counter = 0;
     while ((Math.abs(CD[go].reduce((a,b)=>a+Math.abs(b),0)) >= 1 ||
-            Math.abs(CD[ret].reduce((a,b)=>a+Math.abs(b),0)) && counter <= go){
+            Math.abs(CD[ret].reduce((a,b)=>a+Math.abs(b),0))) 
+           && counter <= go){
       go = (go + 1) % nb_slots;
       ret = (go + coil_span_nb) % nb_slots;
       counter++;
@@ -353,7 +353,7 @@ function drawMagnets(nb_poles){
       }
     }
   } else {
-    // ➤ Domaine physique : afficher les labels A+/A-/B+... dans les encoches
+    // ➤ Domaine physique : afficher les labels A+/A-/B+...
     ctx.font = "14px Arial";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     for (let s=0; s<nb_slots; s++){
