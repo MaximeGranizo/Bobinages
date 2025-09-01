@@ -286,26 +286,72 @@ function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){
   const phaseColors = ['#ff4d4d','#4d80ff','#31c159','#ffa640','#a56bff','#27c0d8'].slice(0,m);
   const sectorWidth = Math.PI/m;
   const slotPitch = TAU/nb_slots;
+  const radiusPhasor = 0.8;
   const phasors = Object.fromEntries(phaseLabels.map(L=>[L,[]]));
+  // distribution des conducteurs (Q × m)
   const CD = Array.from({length: nb_slots}, ()=>Array(m).fill(0));
   let warning_flag = false;
 
+  // affichage des secteurs (électrique)
+  if (electrical){
+    // fond radial des secteurs
+    const cx = canvas.width/2, cy = canvas.height/2, scale=380;
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    for (let j=0;j<m;j++){
+      const center = -2*Math.PI*j/m;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy, radiusPhasor*scale, center-sectorWidth/2, center+sectorWidth/2);
+      ctx.closePath();
+      ctx.fillStyle = phaseColors[j];
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Placement des bobines (aller/retour) et remplissage CD
   let coil_span_nb = 1;
-  if (winding_type.includes("raccourcit") || winding_type.includes("entier")){
+  if (winding_type === 'Bobinage distribué à pas raccourcit' ||
+      winding_type === 'Bobinage distribué à nombre d’encoches par pôle et par phase entier'){
     coil_span_nb = Math.max(1, +raccourcissement);
+  } else if (winding_type === 'Bobinage à pas dentaire'){
+    coil_span_nb = 1;
+  } else if (winding_type === 'Bobinage concentré'){
+    coil_span_nb = 1;
   }
   const turnsWeight = 1/Math.max(nb_layers,1);
 
   const cx = canvas.width/2, cy = canvas.height/2, scale=380;
+  // tracé des phasors de fente
+  ctx.save();
+  ctx.lineWidth = 2;
+  for (let s=0; s<nb_slots; s++){
+    const mech = s*slotPitch;
+    const elec = mech*poles_pair + Math.PI/6; // même décalage que le Python
+    // assignation phase
+    let phaseIdx = -1, sign = +1;
+    for (let j=0;j<m;j++){
+      const centerPos = -2*Math.PI*j/m;
+      const centerNeg = centerPos + Math.PI;
+      if (angleInSector(elec, centerPos, sectorWidth)){ phaseIdx = j; sign = +1; break; }
+      if (angleInSector(elec, centerNeg, sectorWidth)){ phaseIdx = j; sign = -1; break; }
+    }
+    if (phaseIdx<0){ warning_flag = true; continue; }
 
-  // Placement et remplissage CD
+    // affectation dans CD (aller/retour plus tard via coil span)
+    // ici on ne remplit pas « tout de suite » l’aller/retour, on le fait par paires
+  }
+  ctx.restore();
+
+  // Remplissage par paires aller/retour avec prise en compte des couches
   let previous_slot = -1;
   for (let k=0; k<Math.floor(nb_layers*nb_slots/2); k++){
     let go = (previous_slot + 1) % nb_slots;
     let ret = (go + coil_span_nb) % nb_slots;
     let counter = 0;
     while ((Math.abs(CD[go].reduce((a,b)=>a+Math.abs(b),0)) >= 1 ||
-            Math.abs(CD[ret].reduce((a,b)=>a+Math.abs(b),0)) && counter <= go){
+            Math.abs(CD[ret].reduce((a,b)=>a+Math.abs(b),0)) >= 1) && counter <= go){
       go = (go + 1) % nb_slots;
       ret = (go + coil_span_nb) % nb_slots;
       counter++;
@@ -316,6 +362,7 @@ function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){
     const mech = go*slotPitch;
     const elec = mech*poles_pair + Math.PI/6;
 
+    // déterminer phase & polarité
     let phaseIdx = -1, polarity = +1;
     for (let j=0;j<m;j++){
       const centerPos = -2*Math.PI*j/m;
@@ -328,43 +375,27 @@ function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){
     CD[go][phaseIdx] +=  polarity*turnsWeight;
     CD[ret][phaseIdx] += -polarity*turnsWeight;
 
-    const phaseLbl = phaseLabels[phaseIdx];
+    // enregistrer phasors (pour affichage)
+    const phaseLbl = ['A','B','C','D','E','F'][phaseIdx];
     phasors[phaseLbl].push({slot: go, sign: polarity});
   }
 
-  // ==================== TRACÉ ====================
+  // TRACÉ des vecteurs par fente (aller-retour)
   ctx.save();
-  if (electrical){
-    // ➤ Domaine électrique : juste les phasors (star of slots)
-    const r0 = 0.2, r1 = 0.8;
-    for (let s=0; s<nb_slots; s++){
-      for (let j=0;j<m;j++){
-        const w = CD[s][j];
-        if (w === 0) continue;
-        const color = phaseColors[j];
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = 1;
-        const theta = s*slotPitch*poles_pair; // électrique !
-        const [x0,y0] = P(r0, theta, cx,cy,scale);
-        const [x1,y1] = P(r1, theta, cx,cy,scale);
-        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
-      }
-    }
-  } else {
-    // ➤ Domaine physique : afficher les labels A+/A-/B+... dans les encoches
-    ctx.font = "14px Arial";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    for (let s=0; s<nb_slots; s++){
-      for (let j=0;j<m;j++){
-        const w = CD[s][j];
-        if (w === 0) continue;
-        const color = phaseColors[j];
-        const label = phaseLabels[j] + (w>0 ? "+" : "-");
-        const theta = s*slotPitch;
-        const [xt, yt] = P(0.9, theta, cx, cy, scale);
-        ctx.fillStyle = color;
-        ctx.fillText(label, xt, yt);
-      }
+  const r0 = 0.45, r1 = 0.83; // longueur vecteurs
+  for (let s=0; s<nb_slots; s++){
+    // pour chaque phase présente dans CD[s], tracer un segment
+    for (let j=0;j<m;j++){
+      const w = CD[s][j];
+      if (w === 0) continue;
+      const color = ['#ff4d4d','#4d80ff','#31c159','#ffa640','#a56bff','#27c0d8'][j];
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = Math.min(1, Math.abs(w)*1.2);
+      const theta = s*slotPitch;
+      const [x0,y0] = P(r0, theta, cx,cy,scale);
+      const [x1_,y1_] = P(r1, theta, cx,cy,scale);
+      // signe → sens (juste petit marqueur)
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1_,y1_); ctx.stroke();
     }
   }
   ctx.restore();
