@@ -293,6 +293,7 @@ function drawStator(nb_slots){
   // cercle stator
   ctx.beginPath();
   ctx.arc(cx, cy, rBase*scale, 0, TAU);
+  ctx.fill();   // remplissage
   ctx.stroke();
 
   // dents (petits rectangles radiaux)
