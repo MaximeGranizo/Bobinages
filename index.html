@@ -248,33 +248,81 @@ function clearPlot(){
 function P(r, th, cx, cy, scale){
   return [cx + r*Math.cos(th)*scale, cy + r*Math.sin(th)*scale];
 }
+// function drawStator(nb_slots){
+//   const cx = canvas.width/2, cy = canvas.height/2, scale=380;
+//   const rBase = 0.95;
+//   const toothH = 0.43; // cohérent avec app.py
+//   const slotPitch = TAU/nb_slots;
+//   ctx.save();
+//   ctx.strokeStyle = '#dadde4'; ctx.globalAlpha = 0.35;
+//   // cercle stator
+//   ctx.beginPath();
+//   ctx.arc(cx, cy, rBase*scale, 0, TAU);
+//   ctx.stroke();
+//   // dents (petits rectangles radiaux)
+//   for (let s=0; s<nb_slots; s++){
+//     const angle = s*slotPitch;
+//     const r1 = rBase - toothH, r2 = rBase;
+//     const w = slotPitch*0.4;
+//     // deux bords
+//     const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
+//     const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
+//     const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
+//     const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
+//     ctx.beginPath();
+//     ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.lineTo(x4,y4); ctx.closePath();
+//     ctx.stroke();
+//   }
+//   ctx.restore();
+// }
+
+
+
+
 function drawStator(nb_slots){
   const cx = canvas.width/2, cy = canvas.height/2, scale=380;
   const rBase = 0.95;
   const toothH = 0.43; // cohérent avec app.py
   const slotPitch = TAU/nb_slots;
+  
   ctx.save();
-  ctx.strokeStyle = '#dadde4'; ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = '#dadde4'; 
+  ctx.fillStyle = '#dadde4'; // couleur de remplissage
+  ctx.globalAlpha = 0.35;
+
   // cercle stator
   ctx.beginPath();
   ctx.arc(cx, cy, rBase*scale, 0, TAU);
   ctx.stroke();
+
   // dents (petits rectangles radiaux)
   for (let s=0; s<nb_slots; s++){
     const angle = s*slotPitch;
     const r1 = rBase - toothH, r2 = rBase;
     const w = slotPitch*0.4;
-    // deux bords
+
     const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
     const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
     const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
     const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
+
     ctx.beginPath();
-    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.lineTo(x4,y4); ctx.closePath();
-    ctx.stroke();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.lineTo(x3,y3);
+    ctx.lineTo(x4,y4);
+    ctx.closePath();
+
+    ctx.fill();   // remplissage
+    ctx.stroke(); // contour
   }
+
   ctx.restore();
 }
+
+
+
+  
 function drawMagnets(nb_poles){
   const cx = canvas.width/2, cy = canvas.height/2, scale=380;
   const polePitch = TAU/nb_poles;
