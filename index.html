@@ -276,49 +276,53 @@ function P(r, th, cx, cy, scale){
 //   ctx.restore();
 // }
 
-
-
-
 function drawStator(nb_slots){
-  const cx = canvas.width/2, cy = canvas.height/2, scale=380;
-  const rBase = 0.95;
-  const toothH = 0.43; // cohérent avec app.py
+  const cx = canvas.width/2, cy = canvas.height/2, scale = 380;
+  const rBase = 0.95;         // rayon extérieur des dents
+  const toothH = 0.33;        // hauteur dent (radiale)
   const slotPitch = TAU/nb_slots;
-  
+  const statorThick = 0.1;    // épaisseur du stator
+
   ctx.save();
-  ctx.strokeStyle = '#dadde4'; 
-  ctx.fillStyle = '#dadde4'; // couleur de remplissage
+  ctx.strokeStyle = '#000000'; 
+  ctx.fillStyle   = '#dadde4'; 
   ctx.globalAlpha = 0.35;
 
-  // cercle stator
-  ctx.beginPath();
-  ctx.arc(cx, cy, rBase*scale, 0, TAU);
-  ctx.fill();   // remplissage
-  ctx.stroke();
+  const rInner = (rBase - statorThick) * scale;   // rayon intérieur
+  const rOuter = rBase * scale;                   // rayon extérieur
 
-  // dents (petits rectangles radiaux)
+  ctx.beginPath();
+
+  // --- ANNEAU DU STATOR ---
+  ctx.arc(cx, cy, rOuter, 0, TAU);        // cercle extérieur
+  ctx.arc(cx, cy, rInner, 0, TAU, true);  // cercle intérieur (sens inverse)
+
+  // --- DENTS ---
   for (let s=0; s<nb_slots; s++){
-    const angle = s*slotPitch;
+    const angle = s * slotPitch;
     const r1 = rBase - toothH, r2 = rBase;
-    const w = slotPitch*0.4;
+    const w = slotPitch * 0.4;
 
     const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
     const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
     const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
     const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
 
-    ctx.beginPath();
     ctx.moveTo(x1,y1);
     ctx.lineTo(x2,y2);
     ctx.lineTo(x3,y3);
     ctx.lineTo(x4,y4);
     ctx.closePath();
-
-    ctx.fill();   // remplissage
-    ctx.stroke(); // contour
   }
 
+  // --- UN SEUL FILL/STROKE ---
+  ctx.fill();
+  // ctx.stroke();
+
   ctx.restore();
+
+
+  // To do, ajouter les pole shoes / pied de dent
 }
 
 
