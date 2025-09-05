@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Visualisation de bobinage (JS)</title>
+<title>Visualisation de bobinage</title>
 <style>
   :root {
     --bg: #0f1115;
@@ -45,15 +45,6 @@
   .plot-card { position: relative; }
   canvas { width: 100%; aspect-ratio: 1 / 1; background: var(--plot-bg); border-radius: 14px; display: block; }
   .legend { font-size: 12px; color: var(--muted); margin-top: 8px; }
-/*   .kpi {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;
-  }
-  .kpi .box {
-    background: #0f1320; border: 1px solid #2a3142; border-radius: 12px; padding: 10px;
-  } */
-
-
-
 
   .kpi {
   display: grid;
@@ -85,11 +76,11 @@
     <div class="card controls">
       <div class="row">
         <div>
-          <label>Nombre de pôles (pair)</label>
+          <label>Nombre de pôles</label>
           <select id="poles"></select>
         </div>
         <div>
-          <label>Nombre d’encoches (×3)</label>
+          <label>Nombre d’encoches</label>
           <select id="slots"></select>
         </div>
       </div>
@@ -99,7 +90,7 @@
           <select id="layers"></select>
         </div>
         <div>
-          <label>Pas de bobine (en encoches)</label>
+          <label>Pas de bobine (en nombre d'encoches)</label>
           <select id="coilSpan"></select>
         </div>
       </div>
@@ -131,7 +122,7 @@
 
     <div class="card plot-card">
       <canvas id="plot" width="1000" height="1000"></canvas>
-      <div class="legend">Phases A/B/C en rouge/bleu/vert. <br> Granizo Maxime</div>
+      <div class="legend">© 2025 Granizo Maxime. Tous droits réservés.      </div>
     </div>
   </div>
 </div>
@@ -205,7 +196,7 @@ function calculateWindingCharacteristics(m, Ns, p, nb_layers, coil_span, silent=
   // drapeaux d’avertissement
   let warning_flag = false;
   if (q < 0.25) warning_flag = true;
-  if (nb_of_identic_sections < 2) warning_flag = true;
+  // if (nb_of_identic_sections < 2) warning_flag = true;
   const S = (Ns/(m*gcd(Ns, parseInt(p/2,10))));
   if (S - Math.floor(S) > 0) warning_flag = true;
 
@@ -325,7 +316,8 @@ function drawMagnets(nb_poles){
 /* ===========================
    6) Star of slots + distribution
 =========================== */ 
-  function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){ // to fix, l'ordre de distribution des conducteurs est inversé
+// si bobinage a pas ntier nombre de couche non pair est possible + forcer à une couche
+  function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){ 
   const { electrical=false, raccourcissement=0, plotEndTurns=false, legend=false, silent=true } = options||{};
   const poles_pair = nb_poles/2;
   const phaseLabels = ['A','B','C','D','E','F'].slice(0,m);
@@ -385,23 +377,6 @@ function drawMagnets(nb_poles){
   }
 
   // ==================== TRACÉ ====================
-  // if(electrical){
-  //   ctx.save();
-  //   const r0=0.2, r1=0.99;
-  //   const cx = canvas.width/2, cy = canvas.height/2, scale=380;
-  //   for(let s=0; s<nb_slots; s++){
-  //     for(let j=0;j<m;j++){
-  //       const w = CD[s][j];
-  //       if(w===0) continue;
-  //       const color = phaseColors[j];
-  //       const theta = s*slotPitch*poles_pair;
-  //       const [x0,y0] = P(r0, theta, cx, cy, scale);
-  //       const [x1,y1] = P(r1, theta, cx, cy, scale);
-  //       ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.strokeStyle=color; ctx.stroke();
-  //     }
-  //   }
-  //   ctx.restore();
-  // }
   
   if (electrical) {
   ctx.save();
@@ -477,11 +452,9 @@ function drawMagnets(nb_poles){
 
   ctx.restore();
 }
-
+ 
   
-  
-  
-  else {
+  else { // Domaine mécanique
    
 
 ctx.save();
@@ -495,6 +468,14 @@ const angleOffset = 0.04;      // petit décalage angulaire pour bobinage concen
 
 const slotConductorsCount = Array(nb_slots).fill(0).map(()=>0);
 
+
+// objet pour stocker les positions des labels pour chaque slot, phase et signe
+// const labelPositions = Array(nb_slots).fill(0).map(()=>Array(m).fill(0).map(()=>({"+":[], "-":[] })));
+const labelPositions = Array(nb_slots).fill(0).map(() =>
+  Array(m).fill(0).map(() => ({ "+": [], "-": [] }))
+);
+
+
 for(let s=0; s<nb_slots; s++){ // itère sur les slots
   for(let j=0; j<m; j++){      // itère sur les phases
     const w = CD[s][j];
@@ -507,26 +488,53 @@ for(let s=0; s<nb_slots; s++){ // itère sur les slots
     const nConductors = Math.round(Math.abs(w) * nb_layers);
 
     for(let k=0; k<nConductors; k++){  // répéter pour chaque conducteur
+
       const label = phaseLabels[j] + (w>0 ? "+" : "-");
 
       let thetaLabel, radiusLabel;
+      radiusLabel = labelRadiusBase;
 
-      if (winding_type.includes("Bobinage à pas dentaire")) { // To fix, ça serait bien que les conducteurs soient placés du coté du centre de la bobine lorsqu'il y a deux conducteurs à droite/gauche pour ne pas croiser
-  // Concentré :  petit décalage angulaire
+      if (winding_type.includes("Bobinage à pas dentaire")) {  // Concentré :  petit décalage angulaire
+
   const radiusMin = labelRadiusBase;
   const radiusMax = labelRadiusBase + 0.05 * (nb_layers - 1);
 
-  radiusLabel = radiusMin /*+ (radiusMax - radiusMin) * slotConductorsCount[s] / (nb_layers - 1)*/;
+
+  
   slotConductorsCount[s] += 1; // conducteur suivant dans la même encoche
 
-  thetaLabel = thetaBase - angleOffset + (slotConductorsCount[s]-1) *2*  angleOffset /*(w > 0 ? angleOffset : -angleOffset)*/;
+if (nb_layers==1) {thetaLabel = thetaBase}
+else{
+    if(CD[(s+1)%nb_slots][j]>0 || CD[(s+1)%nb_slots][j]<0) { // si il y a un autre conducteur au slot suivant
+       
+      if(CD[(s+nb_slots-1)%nb_slots][j]>0 || CD[(s+nb_slots-1)%nb_slots][j]<0) { // si il y a un autre conducteur au slot précédent aussi  
+        thetaLabel = thetaBase - angleOffset + (slotConductorsCount[s]-1)%2 *2*  angleOffset ;  // répartir droite/gauche
+        if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *Math.floor(k/2) ;}
+      }
 
+      else{
+      thetaLabel = thetaBase + angleOffset;   // si conducteur même phase au slot suivant mais pas au slot précédent : côté droit
+      if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *(k) ;}
+
+          }
+    }
+    else {         // sinon, si pas de conducteur au slot suivant, on met à gauche
+        thetaLabel = thetaBase - angleOffset;
+        if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *(k) ;}
+
+      }
+      
+    }
+
+  
 } else {
   // Distribué : répartir les conducteurs uniformément selon la couche
   const radiusMin = labelRadiusBase;
   const radiusMax = labelRadiusBase + 0.05 * (nb_layers - 1);
 
-  radiusLabel = radiusMin + (radiusMax - radiusMin) * slotConductorsCount[s] / (nb_layers - 1);
+  if(nb_layers==1){radiusLabel = radiusMin ;}
+  else{
+  radiusLabel = radiusMin + (radiusMax - radiusMin) * slotConductorsCount[s] / (nb_layers - 1);}
   slotConductorsCount[s] += 1; // conducteur suivant
 
   thetaLabel = thetaBase;
@@ -536,12 +544,134 @@ for(let s=0; s<nb_slots; s++){ // itère sur les slots
       const [xt, yt] = P(radiusLabel, thetaLabel, cx, cy, scale);
       ctx.fillStyle = color;
       ctx.fillText(label, xt, yt);
+
+      // enregistrer la position pour le tracé de tête de bobine
+      // let signe;
+      // signe = w>0 ? "+" : "-";
+
+      // labelPositions[s][j][signe].push({xt, yt});
+
+      // const sign = w > 0 ? "+" : "-";
+      // labelPositions[s][j][sign].push({x: xt, y: yt});
+      const sign = w > 0 ? "+" : "-";
+      labelPositions[s][j][sign].push({x: xt, y: yt, sign: sign});
+
+
+      // console.log('signe :', sign);
+
+      console.log('label :', label);
+      console.log('labelPositions[s][j]:', labelPositions[s][j]);
+
+
     }
   }
 }
 
 
 ctx.restore();
+
+
+
+
+
+
+if(plotEndTurns==true){
+
+  console.log('Plot des bobines');
+  // console.log('labelPositions', labelPositions);
+  // console.log('CD', CD);
+// ===========================================
+// Tracé des têtes de bobine basé sur labelPositions
+// ===========================================
+ctx.save();
+ctx.lineWidth = 1.2;
+const offsetDistance = 15.0; // décalage depuis le bord du label
+const cx = canvas.width / 2, cy = canvas.height / 2;
+
+for (let s = 0; s < nb_slots; s++) {
+  for (let j = 0; j < m; j++) {
+    const color = phaseColors[j];
+
+    // récupérer les positions + et -
+    const plusPositions = labelPositions[s][j]["+"].slice();   // clone pour manipuler
+    const minusPositions = labelPositions[s][j]["-"].slice();
+
+    // parcourir toutes les positions positives
+    for (let k = 0; k < plusPositions.length; k++) {
+      const p = plusPositions[k];
+
+      // slot de retour
+      const retSlot = (s - coil_span_nb+ nb_slots) % nb_slots;
+      
+      // // A ajouter pour prendre en compte les fois ou le retour est de l'autre côté
+      // if( labelPositions[(s - coil_span_nb+ nb_slots) % nb_slots)][j]["-"] != "" && non relié  ) {const retSlot = (s - coil_span_nb+ nb_slots) % nb_slots;} //il existe un conducteur de la bonne phase et polarité et non relié au slot n° (s - coil_span_nb+ nb_slots) % nb_slots) 
+      // else {const retSlot = (s + coil_span_nb) % nb_slots;} 
+      
+      // récupérer le tableau de positions opposées pour le retour
+      const retList = labelPositions[retSlot][j]["-"];
+      if (!retList || retList.length === 0) continue;
+
+      // prendre le premier point et le retirer pour ne pas le réutiliser
+      const mPos = retList.shift();
+      
+      // enlever de labelPositions ou d'une copie, les deux conducteurs
+
+      // vecteur unitaire pour offset
+      const dx = mPos.x - p.x;
+      const dy = mPos.y - p.y;
+      const length = Math.sqrt(dx*dx + dy*dy);
+      const ux = dx / length;
+      const uy = dy / length;
+
+      // tracer le trait
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(p.x + offsetDistance*ux, p.y + offsetDistance*uy);
+      ctx.lineTo(mPos.x - offsetDistance*ux, mPos.y - offsetDistance*uy);
+      ctx.stroke();
+    }
+
+    // pareil pour les positions négatives (optionnel si tu veux tracer - vers +)
+    for (let k = 0; k < minusPositions.length; k++) {
+      const p = minusPositions[k];
+
+      const retSlot = (s + nb_slots - coil_span_nb) % nb_slots; // slot de retour pour négatif
+
+      // même chose ici pour retslot
+
+      const retList = labelPositions[retSlot][j]["+"];
+      if (!retList || retList.length === 0) continue;
+
+      const mPos = retList.shift();
+
+      const dx = mPos.x - p.x;
+      const dy = mPos.y - p.y;
+      const length = Math.sqrt(dx*dx + dy*dy);
+      const ux = dx / length;
+      const uy = dy / length;
+
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(p.x + offsetDistance*ux, p.y + offsetDistance*uy);
+      ctx.lineTo(mPos.x - offsetDistance*ux, mPos.y - offsetDistance*uy);
+      ctx.stroke();
+    }
+  }
+}
+
+ctx.restore();
+
+  
+}
+
+
+
+
+
+
+
+
+
 
   }
 
@@ -671,43 +801,140 @@ function fillSelect($el, values, sel){
 fillSelect($poles, Array.from({length:20},(_,i)=>2*(i+1)), 10);
 fillSelect($slots, Array.from({length:20},(_,i)=>3*(i+1)), 12);
 
+// function refreshDynamic(){
+//   $msg.textContent = '';
+//   const m = 3;
+//   const poles = +$poles.value;
+//   const slots = +$slots.value;
+
+//   // // couches
+//   // const L = layersPossibilitiesList(slots, poles);
+//   // let defaultLayers;
+//   // if (slots/(m*poles) < 1) defaultLayers = 2; else defaultLayers = L[0];
+//   // fillSelect($layers, L, defaultLayers); // ne permet pas de modifier le nombre de couches, erreur !
+
+//   // couches
+// const L = layersPossibilitiesList(slots, poles);
+// let defaultLayers;
+
+// if (!$layers.value) { // seulement si aucune valeur choisie
+//   if (slots / (m * poles) < 1) {
+//     defaultLayers = 2;
+//   } else {
+//     defaultLayers = L[0];
+//   }
+// } else {
+//   defaultLayers = $layers.value; // garder la sélection de l’utilisateur
+// }
+
+// fillSelect($layers, L, defaultLayers);
+
+//   // pas de bobine
+//   const coilList = coilSpanPossibilitiesList(+$layers.value, slots, poles).sort((a,b)=>b-a);
+//   let defaultSpan = (slots/(m*poles) < 1) ? 1 : Math.max(1, Math.floor(slots/poles));
+//   if (!coilList.includes(defaultSpan)) defaultSpan = coilList[0] ?? 1;
+//   fillSelect($coil, coilList, defaultSpan);
+// }
+// --- variables mémoire (globales au script) ---
+let prevSlots = null;
+let prevPoles = null;
+let prevQIsInteger = null;
+
+// utilitaire : test d'entier avec tolérance
+function isIntegerTol(x, tol = 1e-9) {
+  return Math.abs(x - Math.round(x)) < tol;
+}
+
 function refreshDynamic(){
   $msg.textContent = '';
   const m = 3;
   const poles = +$poles.value;
   const slots = +$slots.value;
 
-  // // couches
-  // const L = layersPossibilitiesList(slots, poles);
-  // let defaultLayers;
-  // if (slots/(m*poles) < 1) defaultLayers = 2; else defaultLayers = L[0];
-  // fillSelect($layers, L, defaultLayers); // ne permet pas de modifier le nombre de couches, erreur !
+  // liste possible des couches pour ces dimensions
+  const L = layersPossibilitiesList(slots, poles);
 
-  // couches
-const L = layersPossibilitiesList(slots, poles);
-let defaultLayers;
+  // calcul du q (encoches par pôle et par phase)
+  const q = slots / (m * poles );
+  const qIsInteger = isIntegerTol(q);
+  console.log('q=', q, 'qIsInteger=', qIsInteger, 'slots=', slots, 'poles=', poles);
 
-if (!$layers.value) { // seulement si aucune valeur choisie
-  if (slots / (m * poles) < 1) {
-    defaultLayers = 2;
+
+  // détecter si l'utilisateur a déjà choisi un nombre de couches
+  const userHasChosenLayers = $layers.value !== "" && $layers.value != null;
+
+  let defaultLayers;
+
+  // --- première visite (initialisation) ---
+  if (prevSlots === null || prevPoles === null) {
+    // cas initial
+    if (qIsInteger) {
+      defaultLayers = 1; // si q entier, on met 1 par défaut au premier affichage
+    } else if (slots / (m * poles) < 1) {
+      defaultLayers = 2;
+    } else {
+      defaultLayers = L[0];
+    }
+
   } else {
-    defaultLayers = L[0];
+    // --- on vient d'un changement (slots/poles) ---
+    const slotsOrPolesChanged = (slots !== prevSlots) || (poles !== prevPoles);
+
+    if (slotsOrPolesChanged && prevQIsInteger === false && qIsInteger === true) {
+      // ON VIENT DE PASSER d'un q NON entier -> q ENTIER : on met 1
+      console.log('ON VIENT DE PASSER d un q NON entier -> q ENTIER : on met le nombre de couche à 1');
+
+      defaultLayers = 1;
+    } else {
+
+      // si l'utilisateur n'a pas choisi lui-même, appliquer règles par défaut
+      if (!userHasChosenLayers) {
+        if (qIsInteger) {
+          defaultLayers = 1;
+        } else if (slots / (m * poles) < 1) {
+          defaultLayers = 2;
+        } else {
+          defaultLayers = L[0];
+        }
+      } else {
+        // garder la sélection utilisateur si elle est valide dans L
+        const userVal = +$layers.value;
+        if (L.includes(userVal)) defaultLayers = userVal;
+        else defaultLayers = (qIsInteger ? 1 : L[0]);
+      }
+    }
   }
-} else {
-  defaultLayers = $layers.value; // garder la sélection de l’utilisateur
-}
 
-fillSelect($layers, L, defaultLayers);
+  // remplir le select des couches avec la liste possible (L) et la valeur par défaut choisie
+  fillSelect($layers, L, defaultLayers);
 
-  // pas de bobine
-  const coilList = coilSpanPossibilitiesList(+$layers.value, slots, poles).sort((a,b)=>b-a);
+  // recalculer / remplir le coil span en fonction de la couche sélectionnée
+  const coilList = coilSpanPossibilitiesList(+ $layers.value, slots, poles).sort((a,b)=>b-a);
   let defaultSpan = (slots/(m*poles) < 1) ? 1 : Math.max(1, Math.floor(slots/poles));
   if (!coilList.includes(defaultSpan)) defaultSpan = coilList[0] ?? 1;
   fillSelect($coil, coilList, defaultSpan);
+
+  // mettre à jour la mémoire pour la prochaine exécution
+  prevSlots = slots;
+  prevPoles = poles;
+  prevQIsInteger = qIsInteger;
+  // if(qIsInteger == true) { console.log('qIsInteger');}
+  //   else { console.log('q Is Not an Integer');}
+
 }
+
+
+
+// console.log('q=', q, 'qIsInteger=', qIsInteger, 'prevQIsInteger=', prevQIsInteger,
+//             'prevSlots=', prevSlots, 'prevPoles=', prevPoles, 'userHasChosenLayers=', userHasChosenLayers);
+
+
+
+
 $poles.addEventListener('change', refreshDynamic);
 $slots.addEventListener('change', refreshDynamic);
 $layers.addEventListener('change', refreshDynamic);
+$slots.addEventListener('input', refreshDynamic);
 refreshDynamic();
 
 $go.addEventListener('click', ()=>{
@@ -724,7 +951,7 @@ $go.addEventListener('click', ()=>{
     if (poles%2 !== 0) throw new Error("❌ Le nombre de pôles doit être pair.");
     if (slots%3 !== 0) throw new Error("❌ Le nombre d’encoches doit être un multiple de 3.");
     if (layers < 1 || layers > 30) throw new Error("❌ Le nombre de couches doit être entre 1 et 30.");
-    if (layers === 1 && ((slots % 2 === 1) || (coil % 2 === 0)))
+    if (layers === 1 && ((slots % 2 === 1) ))//|| (coil % 2 === 0)))
       throw new Error("❌ Bobinage à une couche non faisable.");
     if ((layers * slots / 2) !== Math.floor(layers * slots / 2))
       throw new Error("❌ Les trois phases ont un nombre déséquilibré de conducteurs.");
@@ -751,7 +978,8 @@ $go.addEventListener('click', ()=>{
   }
 });
 
-// premier rendu
+// © 2025 Granizo Maxime. Tous droits réservés.
+
 $go.click();
 </script>
 </body>
