@@ -394,7 +394,7 @@ function drawMagnets(nb_poles){
       if (w === 0) continue;
 
       const color = phaseColors[j];
-      const theta = s * slotPitch * poles_pair;  // angle mécanique * paires de pôles
+      const theta = mod(s * slotPitch * poles_pair,2*Math.PI);  // angle mécanique * paires de pôles
 
       // clé arrondie pour éviter les problèmes de flottants
       const key = Math.round(theta * 1e6) / 1e6;
@@ -505,7 +505,7 @@ for(let s=0; s<nb_slots; s++){ // itère sur les slots
 
 if (nb_layers==1) {thetaLabel = thetaBase}
 else{
-    if(CD[(s+1)%nb_slots][j]>0 || CD[(s+1)%nb_slots][j]<0) { // si il y a un autre conducteur au slot suivant
+    if(CD[mod(s+1,nb_slots)][j]>0 || CD[mod(s+1,nb_slots)][j]<0) { // si il y a un autre conducteur au slot suivant
        
       if(CD[(s+nb_slots-1)%nb_slots][j]>0 || CD[(s+nb_slots-1)%nb_slots][j]<0) { // si il y a un autre conducteur au slot précédent aussi  
         thetaLabel = thetaBase - angleOffset + (slotConductorsCount[s]-1)%2 *2*  angleOffset ;  // répartir droite/gauche
@@ -573,98 +573,70 @@ ctx.restore();
 
 
 
-
-
-if(plotEndTurns==true){
+if(plotEndTurns) {
+  const clone_labelPositions = JSON.parse(JSON.stringify(labelPositions));
 
   console.log('Plot des bobines');
-  // console.log('labelPositions', labelPositions);
-  // console.log('CD', CD);
-// ===========================================
-// Tracé des têtes de bobine basé sur labelPositions
-// ===========================================
-ctx.save();
-ctx.lineWidth = 1.2;
-const offsetDistance = 15.0; // décalage depuis le bord du label
-const cx = canvas.width / 2, cy = canvas.height / 2;
 
-for (let s = 0; s < nb_slots; s++) {
-  for (let j = 0; j < m; j++) {
-    const color = phaseColors[j];
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  const offsetDistance = 15.0;
+  const cx = canvas.width / 2, cy = canvas.height / 2;
 
-    // récupérer les positions + et -
-    const plusPositions = labelPositions[s][j]["+"].slice();   // clone pour manipuler
-    const minusPositions = labelPositions[s][j]["-"].slice();
+  // Fonction utilitaire pour mod
+  const mod = (n, m) => ((n % m) + m) % m;
 
-    // parcourir toutes les positions positives
-    for (let k = 0; k < plusPositions.length; k++) {
-      const p = plusPositions[k];
+  for (let s = 0; s < nb_slots; s++) {
+    for (let j = 0; j < m; j++) {
+      const color = phaseColors[j];
 
-      // slot de retour
-      const retSlot = (s - coil_span_nb+ nb_slots) % nb_slots;
-      
-      // // A ajouter pour prendre en compte les fois ou le retour est de l'autre côté
-      // if( labelPositions[(s - coil_span_nb+ nb_slots) % nb_slots)][j]["-"] != "" && non relié  ) {const retSlot = (s - coil_span_nb+ nb_slots) % nb_slots;} //il existe un conducteur de la bonne phase et polarité et non relié au slot n° (s - coil_span_nb+ nb_slots) % nb_slots) 
-      // else {const retSlot = (s + coil_span_nb) % nb_slots;} 
-      
-      // récupérer le tableau de positions opposées pour le retour
-      const retList = labelPositions[retSlot][j]["-"];
-      if (!retList || retList.length === 0) continue;
+      // récupérer les positions + et -
+      const plusPositions = clone_labelPositions[s][j]["+"].slice();
+      const minusPositions = clone_labelPositions[s][j]["-"].slice();
 
-      // prendre le premier point et le retirer pour ne pas le réutiliser
-      const mPos = retList.shift();
-      
-      // enlever de labelPositions ou d'une copie, les deux conducteurs
+      // Fonction pour tracer un trait et retirer les points
+      const drawAndRemove = (p, retList) => {
+        if (!retList || retList.length === 0) return;
+        const mPos = retList.shift(); // prendre et retirer le point
+        // retirer aussi le point initial p du clone
+        const indexP = clone_labelPositions[s][j]["+"].findIndex(pt => pt === p);
+        if (indexP >= 0) clone_labelPositions[s][j]["+"].splice(indexP, 1);
 
-      // vecteur unitaire pour offset
-      const dx = mPos.x - p.x;
-      const dy = mPos.y - p.y;
-      const length = Math.sqrt(dx*dx + dy*dy);
-      const ux = dx / length;
-      const uy = dy / length;
+        const dx = mPos.x - p.x;
+        const dy = mPos.y - p.y;
+        const length = Math.sqrt(dx*dx + dy*dy);
+        const ux = dx / length;
+        const uy = dy / length;
 
-      // tracer le trait
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(p.x + offsetDistance*ux, p.y + offsetDistance*uy);
-      ctx.lineTo(mPos.x - offsetDistance*ux, mPos.y - offsetDistance*uy);
-      ctx.stroke();
-    }
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(p.x + offsetDistance * ux, p.y + offsetDistance * uy);
+        ctx.lineTo(mPos.x - offsetDistance * ux, mPos.y - offsetDistance * uy);
+        ctx.stroke();
+      };
 
-    // pareil pour les positions négatives (optionnel si tu veux tracer - vers +)
-    for (let k = 0; k < minusPositions.length; k++) {
-      const p = minusPositions[k];
+      // tracer +
+      for (const p of plusPositions) {
+        let retSlot = mod(s + coil_span_nb, nb_slots);
+        if (!clone_labelPositions[retSlot][j]["-"] || clone_labelPositions[retSlot][j]["-"].length === 0) {
+          retSlot = mod(s - coil_span_nb, nb_slots);
+        }
+        drawAndRemove(p, clone_labelPositions[retSlot][j]["-"]);
+      }
 
-      const retSlot = (s + nb_slots - coil_span_nb) % nb_slots; // slot de retour pour négatif
-
-      // même chose ici pour retslot
-
-      const retList = labelPositions[retSlot][j]["+"];
-      if (!retList || retList.length === 0) continue;
-
-      const mPos = retList.shift();
-
-      const dx = mPos.x - p.x;
-      const dy = mPos.y - p.y;
-      const length = Math.sqrt(dx*dx + dy*dy);
-      const ux = dx / length;
-      const uy = dy / length;
-
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(p.x + offsetDistance*ux, p.y + offsetDistance*uy);
-      ctx.lineTo(mPos.x - offsetDistance*ux, mPos.y - offsetDistance*uy);
-      ctx.stroke();
+      // tracer -
+      for (const p of minusPositions) {
+        let retSlot = mod(s - coil_span_nb, nb_slots);
+        if (!clone_labelPositions[retSlot][j]["+"] || clone_labelPositions[retSlot][j]["+"].length === 0) {
+          retSlot = mod(s + coil_span_nb, nb_slots);
+        }
+        drawAndRemove(p, clone_labelPositions[retSlot][j]["+"]);
+      }
     }
   }
+
+  ctx.restore();
 }
-
-ctx.restore();
-
-  
-}
-
-
 
 
 
