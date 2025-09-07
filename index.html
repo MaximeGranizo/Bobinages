@@ -147,6 +147,28 @@ function angleInSector(angle, center, width){
   return (angle > lower || angle <= upper);
 }
 
+// Fonction pour tracer un trait et retirer les points
+      const drawAndRemove = (p,s,j, retList,clone_labelPositions,color,offsetDistance ) => {
+        if (!retList || retList.length === 0) return;
+        const mPos = retList.shift(); // prendre et retirer le point
+        // retirer aussi le point initial p du clone
+        const indexP = clone_labelPositions[s][j]["+"].findIndex(pt => pt === p);
+        if (indexP >= 0) clone_labelPositions[s][j]["+"].splice(indexP, 1);
+
+        const dx = mPos.x - p.x;
+        const dy = mPos.y - p.y;
+        const length = Math.sqrt(dx*dx + dy*dy);
+        const ux = dx / length;
+        const uy = dy / length;
+
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(p.x + offsetDistance * ux, p.y + offsetDistance * uy);
+        ctx.lineTo(mPos.x - offsetDistance * ux, mPos.y - offsetDistance * uy);
+        ctx.stroke();
+      };
+
+
 /* ===========================
    2) Listes dynamiques
 =========================== */
@@ -241,55 +263,133 @@ function P(r, th, cx, cy, scale){
 }
 
 
-function drawStator(nb_slots,nb_layer){
-  const cx = canvas.width/2, cy = canvas.height/2, scale = 380;
-  const rBase = 0.85 + 0.05 * nb_layer;         // rayon extérieur des culasse
-  const toothH = 0.23 + 0.05 * nb_layer;        // hauteur dent (radiale)
-  const slotPitch = TAU/nb_slots;
-  const statorThick = 0.1;    // épaisseur du stator
+// function drawStator(nb_slots,nb_layer){
+//   const cx = canvas.width/2, cy = canvas.height/2, scale = 380;
+//   const rBase = 0.85 + 0.05 * nb_layer;         // rayon extérieur des culasse
+//   const toothH = 0.23 + 0.05 * nb_layer;        // hauteur dent (radiale)
+//   const slotPitch = TAU/nb_slots;
+//   const statorThick = 0.1;    // épaisseur du stator
 
-  ctx.save();
-  ctx.strokeStyle = '#000000'; 
-  ctx.fillStyle   = '#dadde4'; 
-  ctx.globalAlpha = 0.35;
+//   ctx.save();
+//   ctx.strokeStyle = '#000000'; 
+//   ctx.fillStyle   = '#dadde4'; 
+//   ctx.globalAlpha = 0.35;
 
-  const rInner = (rBase - statorThick) * scale;   // rayon intérieur
-  const rOuter = rBase * scale;                   // rayon extérieur
+//   const rInner = (rBase - statorThick) * scale;   // rayon intérieur
+//   const rOuter = rBase * scale;                   // rayon extérieur
 
-  ctx.beginPath();
+//   ctx.beginPath();
 
-  // --- ANNEAU DU STATOR ---
-  ctx.arc(cx, cy, rOuter, 0, TAU);        // cercle extérieur
-  ctx.arc(cx, cy, rInner, 0, TAU, true);  // cercle intérieur (sens inverse)
+//   // --- ANNEAU DU STATOR ---
+//   ctx.arc(cx, cy, rOuter, 0, TAU);        // cercle extérieur
+//   ctx.arc(cx, cy, rInner, 0, TAU, true);  // cercle intérieur (sens inverse)
 
-  // --- DENTS ---
-  for (let s=0; s<nb_slots; s++){
-    const angle = (0.5+s) * slotPitch;
-    const r1 = rBase - toothH, r2 = rBase;
-    const w = slotPitch * 0.4;
+//   // --- DENTS ---
+//   for (let s=0; s<nb_slots; s++){
+//     const angle = (0.5+s) * slotPitch;
+//     const r1 = rBase - toothH, r2 = rBase;
+//     const w = slotPitch * 0.4;
 
-    const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
-    const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
-    const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
-    const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
+//     const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
+//     const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
+//     const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
+//     const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
 
-    ctx.moveTo(x1,y1);
-    ctx.lineTo(x2,y2);
-    ctx.lineTo(x3,y3);
-    ctx.lineTo(x4,y4);
-    ctx.closePath();
-  }
+//     ctx.moveTo(x1,y1);
+//     ctx.lineTo(x2,y2);
+//     ctx.lineTo(x3,y3);
+//     ctx.lineTo(x4,y4);
+//     ctx.closePath();
+//   }
 
-  // --- UN SEUL FILL/STROKE ---
-  ctx.fill();
-  // ctx.stroke();
+//   // --- UN SEUL FILL/STROKE ---
+//   ctx.fill();
+//   // ctx.stroke();
 
-  ctx.restore();
+//   ctx.restore();
 
 
-  // To do, ajouter les pole shoes / pied de dent
+//   // To do, ajouter les pole shoes / pied de dent
+// }
+function drawStator(nb_slots, nb_layer){
+    const cx = canvas.width/2, cy = canvas.height/2, scale = 380;
+    const rBase = 0.85 + 0.05 * nb_layer;         
+    const toothH = 0.23 + 0.05 * nb_layer;        
+    const slotPitch = TAU/nb_slots;
+    const statorThick = 0.1;    
+
+    ctx.save();
+    ctx.strokeStyle = '#000000'; 
+    ctx.fillStyle   = '#dadde4'; 
+    ctx.globalAlpha = 0.35;
+
+    const rInner = (rBase - statorThick) * scale;   
+    const rOuter = rBase * scale;                   
+    const rToothBase = (rBase - toothH) * scale;
+
+    ctx.beginPath();
+
+    // --- ANNEAU DU STATOR ---
+    ctx.arc(cx, cy, rOuter, 0, TAU);        
+    ctx.arc(cx, cy, rInner, 0, TAU, true);  
+
+    // --- DENTS ---
+    for (let s=0; s<nb_slots; s++){
+        const angle = (0.5+s) * slotPitch;
+        const r1 = rBase - toothH, r2 = rBase;
+        const w = slotPitch * 0.4;
+
+        const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
+        const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
+        const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
+        const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
+
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x2,y2);
+        ctx.lineTo(x3,y3);
+        ctx.lineTo(x4,y4);
+        ctx.closePath();
+    }
+
+    ctx.fill();
+
+    // --- PIEDS DE DENT ---
+    const shoeWidth = slotPitch * 0.5; // largeur de l’arc intérieur
+    const shoeOffset = 0.02;           // distance parallèle au rayon pour les petits segments
+    const slopeRatio = 0.1;            // 10% de la hauteur de la dent pour la pente
+
+    for (let s=0; s<nb_slots; s++){
+        const angle = (0.5+s) * slotPitch;
+        const w = shoeWidth / 2;
+
+        const rArc = rToothBase - shoeOffset*scale;          // rayon de l’arc intérieur
+        const rSlope = rToothBase + slopeRatio*toothH*scale; // rayon du raccord vers la dent
+
+        // points extrémités de l’arc
+        const [xStartArc, yStartArc] = P(rArc, angle - w, cx, cy, scale);
+        const [xEndArc, yEndArc] = P(rArc, angle + w, cx, cy, scale);
+
+        // petites lignes parallèles (vers l'extérieur)
+        const [xStartOut, yStartOut] = P(rArc + shoeOffset*scale, angle - w, cx, cy, scale);
+        const [xEndOut, yEndOut] = P(rArc + shoeOffset*scale, angle + w, cx, cy, scale);
+
+        // raccord vers la base de la dent
+        const [xStartSlope, yStartSlope] = P(rSlope, angle - w, cx, cy, scale);
+        const [xEndSlope, yEndSlope] = P(rSlope, angle + w, cx, cy, scale);
+
+        ctx.beginPath();
+        ctx.moveTo(xStartArc, yStartArc);
+        ctx.lineTo(xStartOut, yStartOut);
+        ctx.lineTo(xStartSlope, yStartSlope);
+        ctx.lineTo(xEndSlope, yEndSlope);
+        ctx.lineTo(xEndOut, yEndOut);
+        ctx.lineTo(xEndArc, yEndArc);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    ctx.restore();
 }
-
 
 
   
@@ -583,9 +683,6 @@ if(plotEndTurns) {
   const offsetDistance = 15.0;
   const cx = canvas.width / 2, cy = canvas.height / 2;
 
-  // // Fonction utilitaire pour mod
-  // const mod = (n, m) => ((n % m) + m) % m;
-
   for (let s = 0; s < nb_slots; s++) {
     for (let j = 0; j < m; j++) {
       const color = phaseColors[j];
@@ -594,34 +691,13 @@ if(plotEndTurns) {
       const plusPositions = clone_labelPositions[s][j]["+"].slice();
       const minusPositions = clone_labelPositions[s][j]["-"].slice();
 
-      // Fonction pour tracer un trait et retirer les points
-      const drawAndRemove = (p, retList) => {
-        if (!retList || retList.length === 0) return;
-        const mPos = retList.shift(); // prendre et retirer le point
-        // retirer aussi le point initial p du clone
-        const indexP = clone_labelPositions[s][j]["+"].findIndex(pt => pt === p);
-        if (indexP >= 0) clone_labelPositions[s][j]["+"].splice(indexP, 1);
-
-        const dx = mPos.x - p.x;
-        const dy = mPos.y - p.y;
-        const length = Math.sqrt(dx*dx + dy*dy);
-        const ux = dx / length;
-        const uy = dy / length;
-
-        ctx.strokeStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(p.x + offsetDistance * ux, p.y + offsetDistance * uy);
-        ctx.lineTo(mPos.x - offsetDistance * ux, mPos.y - offsetDistance * uy);
-        ctx.stroke();
-      };
-
       // tracer +
       for (const p of plusPositions) {
         let retSlot = mod(s + coil_span_nb, nb_slots);
         if (!clone_labelPositions[retSlot][j]["-"] || clone_labelPositions[retSlot][j]["-"].length === 0) {
           retSlot = mod(s - coil_span_nb, nb_slots);
         }
-        drawAndRemove(p, clone_labelPositions[retSlot][j]["-"]);
+        drawAndRemove(p,s,j, clone_labelPositions[retSlot][j]["-"],clone_labelPositions,color,offsetDistance );
       }
 
       // tracer -
@@ -630,7 +706,7 @@ if(plotEndTurns) {
         if (!clone_labelPositions[retSlot][j]["+"] || clone_labelPositions[retSlot][j]["+"].length === 0) {
           retSlot = mod(s + coil_span_nb, nb_slots);
         }
-        drawAndRemove(p, clone_labelPositions[retSlot][j]["+"]);
+        drawAndRemove(p,s,j, clone_labelPositions[retSlot][j]["+"],clone_labelPositions,color,offsetDistance );
       }
     }
   }
