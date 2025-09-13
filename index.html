@@ -571,7 +571,7 @@ ctx.textAlign = "center";
 ctx.textBaseline = "middle";
 const cx = canvas.width / 2, cy = canvas.height / 2, scale = 380;
 
-const labelRadiusBase = 0.75; // rayon de base pour le label
+const labelRadiusBase = 0.7; // rayon de base pour le label
 const angleOffset = 0.04;      // petit décalage angulaire pour bobinage concentré
 
 const slotConductorsCount = Array(nb_slots).fill(0).map(()=>0);
@@ -924,16 +924,17 @@ function showWinding({m=3, nb_poles=14, nb_slots=12, nb_layers=2, raccourcisseme
   { center: 4*Math.PI/3,  width: Math.PI/3, color: "green" }  // phase C
 ];
 
-// Dessin sur le canvas
-// const canvas = document.getElementById("plot");
-// const ctx = canvas.getContext("2d");
-showSectors(ctx, sectors);
-
+    // Dessin sur le canvas
+    // const canvas = document.getElementById("plot");
+    // const ctx = canvas.getContext("2d");
+    showSectors(ctx, sectors);
 
   }
   else{
   drawMagnets(nb_poles);
-  drawStator(nb_slots,nb_layers);
+  if(raccourcissement === 1){drawStator(nb_slots,nb_layers/2);}
+  else{drawStator(nb_slots,nb_layers);}
+  
   }
   const { f_torque, nb_of_identic_sections, winding_type, warning_flag:warn1 } =
     calculateWindingCharacteristics(m, nb_slots, nb_poles, nb_layers, raccourcissement);
