@@ -127,13 +127,13 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/mathjs@11/lib/browser/math.js"></script>
+<!-- <script src="https://cdn.jsdelivr.net/npm/mathjs@11/lib/browser/math.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fft.js/dist/fft.min.js"></script>
 
 
+ -->
 
-
-  <script>
+  <!-- <script>
     const { create, all } = math;
     const FFT = window.FFT; // exposé par fft.js
     const mathjs = create(all);
@@ -142,8 +142,8 @@
 
     // ton code ici...
 //   </script>
-  
-// <script>
+  -->
+ <script> 
 
 
 
@@ -847,68 +847,68 @@ function showSectors(ctx, sectors) {
 /* ===========================
    7) Facteur de bobinage (Scuiller)
 =========================== */
-// function calculerFacteurDeBobinage(phasors, CD, nb_slots, nb_poles, m){
-//   const Q = nb_slots, N = m, p = nb_poles/2;
-//   // vecteur spatial : (N/Q) * FFT(CD[:,0]) — on suit la colonne phase A
-//   const space = dftComplex(CD.map(row => row[0]||0)).map(z => ({re: (N/Q)*z.re, im: (N/Q)*z.im}));
-//   // remappage harmonique électrique : indices = mod(p * [0:Q-1], Q)
-//   const Kw_he = new Array(Q);
-//   for (let k=0; k<Q; k++){
-//     const idx = (p * k) % Q; // p peut être .5, mais dans notre cas nb_poles pair → p entier
-//     Kw_he[k] = space[idx];
-//   }
-//   const fundamental = Kw_he[1];
-//   return complexAbs(fundamental);
-// }
-
-
-function calculerFacteurDeBobinage(phasors, conductorsDistribution, nbSlots, nbPoles,m,silent = true,showHarmonics = false,interpolationFactor = 5,maxHarmonics = 30) {
-  const longueurs = Object.values(phasors).map((slots) => slots.length);
-
-  // Vérif équilibre des conducteurs
-  if (new Set(longueurs).size > 1) {
-    if (!silent) {
-      console.warn("⚠️ Déséquilibre entre phases :", longueurs);
-    }
-  } else {
-    if (!silent) console.log("✅ Nombre équilibré de conducteurs par phase");
+function calculerFacteurDeBobinage(phasors, CD, nb_slots, nb_poles, m){
+  const Q = nb_slots, N = m, p = nb_poles/2;
+  // vecteur spatial : (N/Q) * FFT(CD[:,0]) — on suit la colonne phase A
+  const space = dftComplex(CD.map(row => row[0]||0)).map(z => ({re: (N/Q)*z.re, im: (N/Q)*z.im}));
+  // remappage harmonique électrique : indices = mod(p * [0:Q-1], Q)
+  const Kw_he = new Array(Q);
+  for (let k=0; k<Q; k++){
+    const idx = (p * k) % Q; // p peut être .5, mais dans notre cas nb_poles pair → p entier
+    Kw_he[k] = space[idx];
   }
-
-  const Q = nbSlots;
-  const N = m;
-  const p = nbPoles / 2;
-
-  // Distribution des conducteurs
-  const u = conductorsDistribution.map((row) => row[0]);
-  const Npoints = u.length * interpolationFactor;
-  const x = Array.from({ length: Npoints }, (_, i) => u[i % nbSlots]);
-
-  // FFT
-  const f = new FFT(Npoints);
-  const out = new Array(Npoints).fill(0).map(() => [0, 0]); // Complex output
-  f.realTransform(out, x);
-  f.completeSpectrum(out);
-
-  // Normalisation
-  const KwVspaceNorm = out.map(([re, im]) => math.complex(re, im).div(Npoints));
-
-  // Remappage indices électriques
-  const indices = Array.from({ length: KwVspaceNorm.length }, (_, k) =>
-    Math.round((interpolationFactor * (p * k)) % KwVspaceNorm.length)
-  );
-  const KwHElec = indices.map((i) => KwVspaceNorm[i]);
-
-  // Fondamentale
-  const kwFundamental = math.abs(KwHElec[1]);
-
-  // Harmoniques (optionnel)
-  if (showHarmonics) {
-    const harmonics = KwHElec.map((c) => math.abs(c));
-    console.log("📊 Amplitudes harmoniques :", harmonics.slice(0, maxHarmonics));
-  }
-
-  return [kwFundamental, KwHElec];
+  const fundamental = Kw_he[1];
+  return complexAbs(fundamental);
 }
+
+
+// function calculerFacteurDeBobinage(phasors, conductorsDistribution, nbSlots, nbPoles,m,silent = true,showHarmonics = false,interpolationFactor = 5,maxHarmonics = 30) {
+//   const longueurs = Object.values(phasors).map((slots) => slots.length);
+
+//   // Vérif équilibre des conducteurs
+//   if (new Set(longueurs).size > 1) {
+//     if (!silent) {
+//       console.warn("⚠️ Déséquilibre entre phases :", longueurs);
+//     }
+//   } else {
+//     if (!silent) console.log("✅ Nombre équilibré de conducteurs par phase");
+//   }
+
+//   const Q = nbSlots;
+//   const N = m;
+//   const p = nbPoles / 2;
+
+//   // Distribution des conducteurs
+//   const u = conductorsDistribution.map((row) => row[0]);
+//   const Npoints = u.length * interpolationFactor;
+//   const x = Array.from({ length: Npoints }, (_, i) => u[i % nbSlots]);
+
+//   // FFT
+//   const f = new FFT(Npoints);
+//   const out = new Array(Npoints).fill(0).map(() => [0, 0]); // Complex output
+//   f.realTransform(out, x);
+//   f.completeSpectrum(out);
+
+//   // Normalisation
+//   const KwVspaceNorm = out.map(([re, im]) => math.complex(re, im).div(Npoints));
+
+//   // Remappage indices électriques
+//   const indices = Array.from({ length: KwVspaceNorm.length }, (_, k) =>
+//     Math.round((interpolationFactor * (p * k)) % KwVspaceNorm.length)
+//   );
+//   const KwHElec = indices.map((i) => KwVspaceNorm[i]);
+
+//   // Fondamentale
+//   const kwFundamental = math.abs(KwHElec[1]);
+
+//   // Harmoniques (optionnel)
+//   if (showHarmonics) {
+//     const harmonics = KwHElec.map((c) => math.abs(c));
+//     console.log("📊 Amplitudes harmoniques :", harmonics.slice(0, maxHarmonics));
+//   }
+
+//   return [kwFundamental, KwHElec];
+// }
 
 /* ===========================
    8) Orchestrateur
