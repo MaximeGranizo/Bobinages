@@ -127,15 +127,40 @@
   </div>
 </div>
 
-<script>
+<script src="https://cdn.jsdelivr.net/npm/mathjs@11/lib/browser/math.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fft.js/dist/fft.min.js"></script>
+
+
+
+
+  <script>
+    const { create, all } = math;
+    const FFT = window.FFT; // exposé par fft.js
+    const mathjs = create(all);
+
+    const TAU = Math.PI * 2;
+
+    // ton code ici...
+//   </script>
+  
+// <script>
+
+
+
 /* ===========================
    1) Petites utilitaires
 =========================== */
+
 const TAU = Math.PI * 2;
+
 const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
+
 function deg(x){ return x*180/Math.PI; }
+
 function mod(a, n){ return ((a % n) + n) % n; }
+
 function numberToLetter(n){ return String.fromCharCode('a'.charCodeAt(0) + (parseInt(n,10) - 1)); }
+
 function angleInSector(angle, center, width){
   angle = +angle; center = +center;
   angle = +(mod(angle, TAU)).toFixed(6);
@@ -194,6 +219,7 @@ function coilSpanPossibilitiesList(nb_layer, nb_slot, nb_pole){
    3) Caractéristiques bobinage
 =========================== */
 function ppcm(a,b){ return (a*b)/gcd(a,b); }
+
 function gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ const t=b; b=a%b; a=t; } return a; }
 
 function calculateWindingCharacteristics(m, Ns, p, nb_layers, coil_span, silent=false){
@@ -257,155 +283,135 @@ function clearPlot(){
   ctx.fillRect(0,0,canvas.width, canvas.height);
   ctx.restore();
 }
+
 // conv polaire → écran
 function P(r, th, cx, cy, scale){
   return [cx + r*Math.cos(th)*scale, cy + r*Math.sin(th)*scale];
 }
 
 
-// function drawStator(nb_slots,nb_layer){
-//   const cx = canvas.width/2, cy = canvas.height/2, scale = 380;
-//   const rBase = 0.85 + 0.05 * nb_layer;         // rayon extérieur des culasse
-//   const toothH = 0.23 + 0.05 * nb_layer;        // hauteur dent (radiale)
-//   const slotPitch = TAU/nb_slots;
-//   const statorThick = 0.1;    // épaisseur du stator
 
-//   ctx.save();
-//   ctx.strokeStyle = '#000000'; 
-//   ctx.fillStyle   = '#dadde4'; 
-//   ctx.globalAlpha = 0.35;
-
-//   const rInner = (rBase - statorThick) * scale;   // rayon intérieur
-//   const rOuter = rBase * scale;                   // rayon extérieur
-
-//   ctx.beginPath();
-
-//   // --- ANNEAU DU STATOR ---
-//   ctx.arc(cx, cy, rOuter, 0, TAU);        // cercle extérieur
-//   ctx.arc(cx, cy, rInner, 0, TAU, true);  // cercle intérieur (sens inverse)
-
-//   // --- DENTS ---
-//   for (let s=0; s<nb_slots; s++){
-//     const angle = (0.5+s) * slotPitch;
-//     const r1 = rBase - toothH, r2 = rBase;
-//     const w = slotPitch * 0.4;
-
-//     const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
-//     const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
-//     const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
-//     const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
-
-//     ctx.moveTo(x1,y1);
-//     ctx.lineTo(x2,y2);
-//     ctx.lineTo(x3,y3);
-//     ctx.lineTo(x4,y4);
-//     ctx.closePath();
-//   }
-
-//   // --- UN SEUL FILL/STROKE ---
-//   ctx.fill();
-//   // ctx.stroke();
-
-//   ctx.restore();
-
-
-//   // To do, ajouter les pole shoes / pied de dent
-// }
 function drawStator(nb_slots, nb_layer){
-    const cx = canvas.width/2, cy = canvas.height/2, scale = 380;
-    const rBase = 0.85 + 0.05 * nb_layer;         
-    const toothH = 0.23 + 0.05 * nb_layer;        
+    const cx = canvas.width/2, cy = canvas.height/2;
+    const scale = 380;
+    const rBase = 0.85 + 0.05 * nb_layer;
+    const toothH = 0.23 + 0.05 * nb_layer;
     const slotPitch = TAU/nb_slots;
-    const statorThick = 0.1;    
+    const statorThick = 0.1;
+    const slot_opening = 0.4; // 0 = pas de pied de dent , 1 = pieds connectés
+    const labelRadius = rBase - statorThick/2;
+    const rOuter = rBase ;
+    const rInner = (rBase - statorThick) ;
+    const rToothBase = (rBase - toothH) ;
+
+    // --- Pieds de dent avec arc ---
+    const shoeWidth = slotPitch * 0.7;    // largeur de l’arc
+    const shoeDepth = 0.05 ;       // rayon intérieur
+    const slopeRatio = 0.1;               // pente vers la dent
+
+
+    const rShoe = rToothBase - shoeDepth;     // rayon de l'arc
+    const rSlope = rToothBase*0.9;                // rayon de la dent
 
     ctx.save();
-    ctx.strokeStyle = '#000000'; 
-    ctx.fillStyle   = '#dadde4'; 
+    ctx.strokeStyle = '#000';
+    ctx.fillStyle = '#dadde4';
     ctx.globalAlpha = 0.35;
-
-    const rInner = (rBase - statorThick) * scale;   
-    const rOuter = rBase * scale;                   
-    const rToothBase = (rBase - toothH) * scale;
-
+    
     ctx.beginPath();
 
-    // --- ANNEAU DU STATOR ---
-    ctx.arc(cx, cy, rOuter, 0, TAU);        
-    ctx.arc(cx, cy, rInner, 0, TAU, true);  
+    // --- Couronne ---
+    ctx.arc(cx, cy, rOuter*scale, 0, TAU);
+    ctx.arc(cx, cy, rInner*scale, 0, TAU, true);
+    // ctx.closePath();
 
-    // --- DENTS ---
-    for (let s=0; s<nb_slots; s++){
-        const angle = (0.5+s) * slotPitch;
-        const r1 = rBase - toothH, r2 = rBase;
-        const w = slotPitch * 0.4;
+    // ctx.fill();
+    // ctx.stroke();
 
-        const [x1,y1] = P(r1, angle - w/2, cx, cy, scale);
-        const [x2,y2] = P(r2, angle - w/2, cx, cy, scale);
-        const [x3,y3] = P(r2, angle + w/2, cx, cy, scale);
-        const [x4,y4] = P(r1, angle + w/2, cx, cy, scale);
+    // --- Dents ---
+    const toothWidth = slotPitch * 0.4;
+    for(let s=0; s<nb_slots; s++){
+        const angle = (0.5 + s) * slotPitch;
+        const w = toothWidth/2;
+
+        // --- Arc du pied de dent avec pente intermédiaire ---
+
+        // Points intermédiaires pour la pente
+        const [xStartSlope, yStartSlope] = P(rSlope, angle - w - (slotPitch-toothWidth)/2 * (slot_opening), cx, cy,scale);
+        const [xEndSlope, yEndSlope]     = P(rSlope, angle + w + (slotPitch-toothWidth)/2 * (slot_opening), cx, cy,scale);
+
+        // Points à la base de la dent
+        const [xStartDent, yStartDent] = P(rToothBase, angle - w, cx, cy,scale);
+        const [xEndDent, yEndDent]     = P(rToothBase, angle + w, cx, cy,scale);
+
+        const [xStartDent1, yStartDent1] = P(rToothBase*0.95, angle + w + (slotPitch-toothWidth)/2 * (slot_opening), cx, cy,scale);
+        const [xEndDent1, yEndDent1]     = P(rToothBase*0.95, angle - w - (slotPitch-toothWidth)/2 * (slot_opening), cx, cy,scale);
+
+
+
+        const [x1,y1] = P(rToothBase, angle - w, cx, cy,scale);
+        const [x2,y2] = P(rOuter, angle - w, cx, cy,scale);
+        const [x3,y3] = P(rOuter, angle + w, cx, cy,scale);
+        const [x4,y4] = P(rToothBase, angle + w, cx, cy,scale); // bas du pied de dent gauche
 
         ctx.moveTo(x1,y1);
         ctx.lineTo(x2,y2);
         ctx.lineTo(x3,y3);
         ctx.lineTo(x4,y4);
+
+        // pied de dent
+        ctx.lineTo(xStartDent1, yStartDent1);   // base pied de dent gauche
+        ctx.lineTo(xEndSlope, yEndSlope);     // bas de pente droite
+
+        ctx.arc(cx, cy, rSlope*scale, angle + 1.4 * w, angle - 1.4 * w, true);
+
+        ctx.lineTo(xStartSlope, yStartSlope); // bas de pente gauche
+        ctx.lineTo(xEndDent1, yEndDent1);       // base dent droite
+
+
         ctx.closePath();
+
+        // numéro de l'encoche
+        const [xt, yt] = P(labelRadius, -s*slotPitch, cx, cy, scale);
+        // ctx.fillStyle = color;
+        // ctx.font = "16px Arial";
+        ctx.font = "bold 16px Arial";  // texte en gras
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(s+1  , xt, yt);
     }
 
-    ctx.fill();
-
-    // --- PIEDS DE DENT ---
-    const shoeWidth = slotPitch * 0.5; // largeur de l’arc intérieur
-    const shoeOffset = 0.02;           // distance parallèle au rayon pour les petits segments
-    const slopeRatio = 0.1;            // 10% de la hauteur de la dent pour la pente
-
-    for (let s=0; s<nb_slots; s++){
-        const angle = (0.5+s) * slotPitch;
-        const w = shoeWidth / 2;
-
-        const rArc = rToothBase - shoeOffset*scale;          // rayon de l’arc intérieur
-        const rSlope = rToothBase + slopeRatio*toothH*scale; // rayon du raccord vers la dent
-
-        // points extrémités de l’arc
-        const [xStartArc, yStartArc] = P(rArc, angle - w, cx, cy, scale);
-        const [xEndArc, yEndArc] = P(rArc, angle + w, cx, cy, scale);
-
-        // petites lignes parallèles (vers l'extérieur)
-        const [xStartOut, yStartOut] = P(rArc + shoeOffset*scale, angle - w, cx, cy, scale);
-        const [xEndOut, yEndOut] = P(rArc + shoeOffset*scale, angle + w, cx, cy, scale);
-
-        // raccord vers la base de la dent
-        const [xStartSlope, yStartSlope] = P(rSlope, angle - w, cx, cy, scale);
-        const [xEndSlope, yEndSlope] = P(rSlope, angle + w, cx, cy, scale);
-
-        ctx.beginPath();
-        ctx.moveTo(xStartArc, yStartArc);
-        ctx.lineTo(xStartOut, yStartOut);
-        ctx.lineTo(xStartSlope, yStartSlope);
-        ctx.lineTo(xEndSlope, yEndSlope);
-        ctx.lineTo(xEndOut, yEndOut);
-        ctx.lineTo(xEndArc, yEndArc);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    ctx.restore();
+ctx.fill();
+ctx.restore();
 }
 
 
-  
 function drawMagnets(nb_poles){
   const cx = canvas.width/2, cy = canvas.height/2, scale=380;
   const polePitch = TAU/nb_poles;
   const rInner = 0.35, rOuter = 0.52;
   ctx.save();
+
+    // --- Couronne ---
+    ctx.beginPath();
+    ctx.arc(cx, cy, (rInner+rOuter)/2*scale, 0, TAU);
+    ctx.arc(cx, cy, rInner*scale, 0, TAU, true);
+    ctx.closePath();
+    ctx.strokeStyle = '#000';
+    ctx.fillStyle = '#dadde4';
+    ctx.globalAlpha = 0.35;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+
   for (let k=0; k<nb_poles; k++){
     const start = k*polePitch, end = (k+1)*polePitch;
     ctx.beginPath();
     // wedge
     ctx.moveTo(...P(0,0,cx,cy,scale));
     ctx.arc(cx,cy, rOuter*scale, start, end);
-    ctx.lineTo(...P(rInner, end, cx,cy,scale));
-    ctx.arc(cx,cy, rInner*scale, end, start, true);
+    ctx.lineTo(...P((rInner+rOuter)/2, end, cx,cy,scale));
+    ctx.arc(cx,cy, (rInner+rOuter)/2*scale, end, start, true);
     ctx.closePath();
     ctx.fillStyle = (k%2===0) ? 'rgba(255,80,80,0.6)' : 'rgba(80,140,255,0.6)';
     ctx.fill();
@@ -416,7 +422,7 @@ function drawMagnets(nb_poles){
 /* ===========================
    6) Star of slots + distribution
 =========================== */ 
-// si bobinage a pas ntier nombre de couche non pair est possible + forcer à une couche
+ 
   function starOfSlots(winding_type, m, nb_poles, nb_slots, nb_layers, options){ 
   const { electrical=false, raccourcissement=0, plotEndTurns=false, legend=false, silent=true } = options||{};
   const poles_pair = nb_poles/2;
@@ -536,7 +542,8 @@ function drawMagnets(nb_poles){
         // texte radialement décalé pour éviter superposition
         const [xt, yt] = P(labelRadius + nLabel * delta, theta, cx, cy, scale);
         ctx.fillStyle = color;
-        ctx.font = "16px Arial";
+        ctx.font = "bold 16px Arial";  // texte en gras
+        // ctx.font = "16px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(`S${s + 1}` + (w > 0 ? "+" : "-"), xt, yt);
@@ -559,6 +566,7 @@ function drawMagnets(nb_poles){
 
 ctx.save();
 ctx.font = "14px Arial";
+ctx.font = "bold 14px Arial";  // texte en gras
 ctx.textAlign = "center";
 ctx.textBaseline = "middle";
 const cx = canvas.width / 2, cy = canvas.height / 2, scale = 380;
@@ -596,38 +604,36 @@ for(let s=0; s<nb_slots; s++){ // itère sur les slots
 
       if (winding_type.includes("Bobinage à pas dentaire")) {  // Concentré :  petit décalage angulaire
 
-  const radiusMin = labelRadiusBase;
-  const radiusMax = labelRadiusBase + 0.05 * (nb_layers - 1);
+        const radiusMin = labelRadiusBase;
+        const radiusMax = labelRadiusBase + 0.05 * (nb_layers - 1);
+        slotConductorsCount[s] += 1; // conducteur suivant dans la même encoche
 
+        if (nb_layers==1) {thetaLabel = thetaBase}
+        else{
+            if( (CD[mod(s+1,nb_slots)][j]>0 && w<0) || (CD[mod(s+1,nb_slots)][j]<0 && w>0 )) { // si il y a un autre conducteur de polarité opposé au slot suivant
+              
+              if((CD[(s+nb_slots-1)%nb_slots][j]>0 && w<0) || (CD[(s+nb_slots-1)%nb_slots][j]<0 && w>0)) { // si il y a un autre conducteur au slot précédent aussi  
+                thetaLabel = thetaBase - angleOffset + (slotConductorsCount[s]-1)%2 *2*  angleOffset ;  // répartir droite/gauche
 
-  
-  slotConductorsCount[s] += 1; // conducteur suivant dans la même encoche
+                if(nb_layers>2){
+                  radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *Math.floor(k/2) ;}
+              }
 
-if (nb_layers==1) {thetaLabel = thetaBase}
-else{
-    if(CD[mod(s+1,nb_slots)][j]>0 || CD[mod(s+1,nb_slots)][j]<0) { // si il y a un autre conducteur au slot suivant
-       
-      if(CD[(s+nb_slots-1)%nb_slots][j]>0 || CD[(s+nb_slots-1)%nb_slots][j]<0) { // si il y a un autre conducteur au slot précédent aussi  
-        thetaLabel = thetaBase - angleOffset + (slotConductorsCount[s]-1)%2 *2*  angleOffset ;  // répartir droite/gauche
-        if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *Math.floor(k/2) ;}
-      }
+              else{ // sinon s'il y a un conducteur au slot suivant mais pas au slot précédent
 
-      else{
-      thetaLabel = thetaBase + angleOffset;   // si conducteur même phase au slot suivant mais pas au slot précédent : côté droit
-      if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *(k) ;}
+              thetaLabel = thetaBase + angleOffset;   // le mettre : côté droit
+              if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *(k) ;}
+                  }
 
-          }
-    }
-    else {         // sinon, si pas de conducteur au slot suivant, on met à gauche
-        thetaLabel = thetaBase - angleOffset;
-        if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *(k) ;}
-
-      }
-      
-    }
-
-  
-} else {
+            }
+            else {         // sinon, si pas de conducteur au slot suivant, on met à gauche
+                thetaLabel = thetaBase - angleOffset;
+                if(nb_layers>2){radiusLabel = radiusMin + (radiusMax - radiusMin)/ (nb_layers - 1) *(k) ;}
+              }
+              
+            }
+      } 
+else {
   // Distribué : répartir les conducteurs uniformément selon la couche
   const radiusMin = labelRadiusBase;
   const radiusMax = labelRadiusBase + 0.05 * (nb_layers - 1);
@@ -659,8 +665,8 @@ else{
 
       // console.log('signe :', sign);
 
-      console.log('label :', label);
-      console.log('labelPositions[s][j]:', labelPositions[s][j]);
+      // console.log('label :', label);
+      // console.log('labelPositions[s][j]:', labelPositions[s][j]);
 
 
     }
@@ -691,26 +697,96 @@ if(plotEndTurns) {
       const plusPositions = clone_labelPositions[s][j]["+"].slice();
       const minusPositions = clone_labelPositions[s][j]["-"].slice();
 
-      // tracer +
-      for (const p of plusPositions) {
-        let retSlot = mod(s + coil_span_nb, nb_slots);
-        if (!clone_labelPositions[retSlot][j]["-"] || clone_labelPositions[retSlot][j]["-"].length === 0) {
-          retSlot = mod(s - coil_span_nb, nb_slots);
-        }
-        drawAndRemove(p,s,j, clone_labelPositions[retSlot][j]["-"],clone_labelPositions,color,offsetDistance );
-      }
+      // // tracer +
+      // for (const p of plusPositions) {
+      //   let retSlot = mod(s + coil_span_nb, nb_slots);
+      //   if (!clone_labelPositions[retSlot][j]["-"] || clone_labelPositions[retSlot][j]["-"].length === 0) {
+      //     retSlot = mod(s - coil_span_nb, nb_slots);
+      //   }
+      //   drawAndRemove(p,s,j, clone_labelPositions[retSlot][j]["-"],clone_labelPositions,color,offsetDistance );
+      // }
 
-      // tracer -
-      for (const p of minusPositions) {
-        let retSlot = mod(s - coil_span_nb, nb_slots);
-        if (!clone_labelPositions[retSlot][j]["+"] || clone_labelPositions[retSlot][j]["+"].length === 0) {
-          retSlot = mod(s + coil_span_nb, nb_slots);
-        }
-        drawAndRemove(p,s,j, clone_labelPositions[retSlot][j]["+"],clone_labelPositions,color,offsetDistance );
-      }
-    }
+      // // tracer -
+      // for (const p of minusPositions) {
+      //   let retSlot = mod(s - coil_span_nb, nb_slots);
+      //   if (!clone_labelPositions[retSlot][j]["+"] || clone_labelPositions[retSlot][j]["+"].length === 0) {
+      //     retSlot = mod(s + coil_span_nb, nb_slots);
+      //   }
+      //   drawAndRemove(p,s,j, clone_labelPositions[retSlot][j]["+"],clone_labelPositions,color,offsetDistance );
+      // }
+  
+
+  
+
+  for (const p of plusPositions) {
+  const retSlotPos = mod(s + coil_span_nb, nb_slots); // sens positif
+  const retSlotNeg = mod(s - coil_span_nb, nb_slots); // sens négatif
+
+  const hasPos = clone_labelPositions[retSlotPos][j]["-"] && clone_labelPositions[retSlotPos][j]["-"].length > 0;
+  const hasNeg = clone_labelPositions[retSlotNeg][j]["-"] && clone_labelPositions[retSlotNeg][j]["-"].length > 0;
+
+  let retSlot = null;
+
+  if (hasPos && !hasNeg) {
+    retSlot = retSlotPos;
+  } else if (!hasPos && hasNeg) {
+    retSlot = retSlotNeg;
+  } else if (hasPos && hasNeg) {
+    // comparer les distances
+    const posCandidate = clone_labelPositions[retSlotPos][j]["-"][0];
+    const negCandidate = clone_labelPositions[retSlotNeg][j]["-"][0];
+
+    const dPos = Math.hypot(posCandidate.x - p.x, posCandidate.y - p.y);
+    const dNeg = Math.hypot(negCandidate.x - p.x, negCandidate.y - p.y);
+
+    // choisir celui qui est le plus proche
+    retSlot = dPos <= dNeg ? retSlotPos : retSlotNeg;
   }
 
+  if (retSlot !== null) {
+    drawAndRemove(p, s, j, clone_labelPositions[retSlot][j]["-"], clone_labelPositions, color, offsetDistance);
+  }
+}
+
+
+
+// tracer -
+for (const p of minusPositions) {
+  const retSlotNeg = mod(s - coil_span_nb, nb_slots); // sens négatif
+  const retSlotPos = mod(s + coil_span_nb, nb_slots); // sens positif
+
+  const hasNeg = clone_labelPositions[retSlotNeg][j]["+"] && clone_labelPositions[retSlotNeg][j]["+"].length > 0;
+  const hasPos = clone_labelPositions[retSlotPos][j]["+"] && clone_labelPositions[retSlotPos][j]["+"].length > 0;
+
+  let retSlot = null;
+
+  if (hasNeg && !hasPos) {
+    retSlot = retSlotNeg;
+  } else if (!hasNeg && hasPos) {
+    retSlot = retSlotPos;
+  } else if (hasNeg && hasPos) {
+    // comparer les distances
+    const negCandidate = clone_labelPositions[retSlotNeg][j]["+"][0];
+    const posCandidate = clone_labelPositions[retSlotPos][j]["+"][0];
+
+    const dNeg = Math.hypot(negCandidate.x - p.x, negCandidate.y - p.y);
+    const dPos = Math.hypot(posCandidate.x - p.x, posCandidate.y - p.y);
+
+    // choisir le plus proche
+    retSlot = dNeg <= dPos ? retSlotNeg : retSlotPos;
+  }
+
+  if (retSlot !== null) {
+    drawAndRemove(p, s, j, clone_labelPositions[retSlot][j]["+"], clone_labelPositions, color, offsetDistance);
+  }
+}
+
+
+
+
+
+}
+  }
   ctx.restore();
 }
 
@@ -771,18 +847,67 @@ function showSectors(ctx, sectors) {
 /* ===========================
    7) Facteur de bobinage (Scuiller)
 =========================== */
-function calculerFacteurDeBobinage(phasors, CD, nb_slots, nb_poles, m){
-  const Q = nb_slots, N = m, p = nb_poles/2;
-  // vecteur spatial : (N/Q) * FFT(CD[:,0]) — on suit la colonne phase A
-  const space = dftComplex(CD.map(row => row[0]||0)).map(z => ({re: (N/Q)*z.re, im: (N/Q)*z.im}));
-  // remappage harmonique électrique : indices = mod(p * [0:Q-1], Q)
-  const Kw_he = new Array(Q);
-  for (let k=0; k<Q; k++){
-    const idx = (p * k) % Q; // p peut être .5, mais dans notre cas nb_poles pair → p entier
-    Kw_he[k] = space[idx];
+// function calculerFacteurDeBobinage(phasors, CD, nb_slots, nb_poles, m){
+//   const Q = nb_slots, N = m, p = nb_poles/2;
+//   // vecteur spatial : (N/Q) * FFT(CD[:,0]) — on suit la colonne phase A
+//   const space = dftComplex(CD.map(row => row[0]||0)).map(z => ({re: (N/Q)*z.re, im: (N/Q)*z.im}));
+//   // remappage harmonique électrique : indices = mod(p * [0:Q-1], Q)
+//   const Kw_he = new Array(Q);
+//   for (let k=0; k<Q; k++){
+//     const idx = (p * k) % Q; // p peut être .5, mais dans notre cas nb_poles pair → p entier
+//     Kw_he[k] = space[idx];
+//   }
+//   const fundamental = Kw_he[1];
+//   return complexAbs(fundamental);
+// }
+
+
+function calculerFacteurDeBobinage(phasors, conductorsDistribution, nbSlots, nbPoles,m,silent = true,showHarmonics = false,interpolationFactor = 5,maxHarmonics = 30) {
+  const longueurs = Object.values(phasors).map((slots) => slots.length);
+
+  // Vérif équilibre des conducteurs
+  if (new Set(longueurs).size > 1) {
+    if (!silent) {
+      console.warn("⚠️ Déséquilibre entre phases :", longueurs);
+    }
+  } else {
+    if (!silent) console.log("✅ Nombre équilibré de conducteurs par phase");
   }
-  const fundamental = Kw_he[1];
-  return complexAbs(fundamental);
+
+  const Q = nbSlots;
+  const N = m;
+  const p = nbPoles / 2;
+
+  // Distribution des conducteurs
+  const u = conductorsDistribution.map((row) => row[0]);
+  const Npoints = u.length * interpolationFactor;
+  const x = Array.from({ length: Npoints }, (_, i) => u[i % nbSlots]);
+
+  // FFT
+  const f = new FFT(Npoints);
+  const out = new Array(Npoints).fill(0).map(() => [0, 0]); // Complex output
+  f.realTransform(out, x);
+  f.completeSpectrum(out);
+
+  // Normalisation
+  const KwVspaceNorm = out.map(([re, im]) => math.complex(re, im).div(Npoints));
+
+  // Remappage indices électriques
+  const indices = Array.from({ length: KwVspaceNorm.length }, (_, k) =>
+    Math.round((interpolationFactor * (p * k)) % KwVspaceNorm.length)
+  );
+  const KwHElec = indices.map((i) => KwVspaceNorm[i]);
+
+  // Fondamentale
+  const kwFundamental = math.abs(KwHElec[1]);
+
+  // Harmoniques (optionnel)
+  if (showHarmonics) {
+    const harmonics = KwHElec.map((c) => math.abs(c));
+    console.log("📊 Amplitudes harmoniques :", harmonics.slice(0, maxHarmonics));
+  }
+
+  return [kwFundamental, KwHElec];
 }
 
 /* ===========================
@@ -957,6 +1082,7 @@ function refreshDynamic(){
   fillSelect($layers, L, defaultLayers);
 
   // recalculer / remplir le coil span en fonction de la couche sélectionnée
+  // si bobinage a pas entier nombre de couche non pair est possible
   const coilList = coilSpanPossibilitiesList(+ $layers.value, slots, poles).sort((a,b)=>b-a);
   let defaultSpan = (slots/(m*poles) < 1) ? 1 : Math.max(1, Math.floor(slots/poles));
   if (!coilList.includes(defaultSpan)) defaultSpan = coilList[0] ?? 1;
@@ -966,8 +1092,6 @@ function refreshDynamic(){
   prevSlots = slots;
   prevPoles = poles;
   prevQIsInteger = qIsInteger;
-  // if(qIsInteger == true) { console.log('qIsInteger');}
-  //   else { console.log('q Is Not an Integer');}
 
 }
 
@@ -995,11 +1119,12 @@ $go.addEventListener('click', ()=>{
     const endTurns = +$endT.value===1;
     const elec   = +$elec.value===1;
 
-    // validations (mêmes que app.py)
+    // validations
     if (poles%2 !== 0) throw new Error("❌ Le nombre de pôles doit être pair.");
     if (slots%3 !== 0) throw new Error("❌ Le nombre d’encoches doit être un multiple de 3.");
     if (layers < 1 || layers > 30) throw new Error("❌ Le nombre de couches doit être entre 1 et 30.");
     if (layers === 1 && ((slots % 2 === 1) ))//|| (coil % 2 === 0)))
+    // if (layers === 1 && ((slots % 2 === 1) || coil % 2 === 0))
       throw new Error("❌ Bobinage à une couche non faisable.");
     if ((layers * slots / 2) !== Math.floor(layers * slots / 2))
       throw new Error("❌ Les trois phases ont un nombre déséquilibré de conducteurs.");
